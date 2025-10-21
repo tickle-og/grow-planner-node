@@ -3,11 +3,11 @@
 ## Quickstart
 pnpm install
 cp .env.example .env
-# edit DATABASE_URL / JWT_SECRET as needed
+# set DATABASE_URL (e.g., file:./dev.db or postgres://...), set a strong JWT_SECRET
 pnpm run dev
 
 ## DB (Drizzle)
-pnpm drizzle:generate   # emit SQL from schema
+pnpm drizzle:generate   # generate SQL from schema
 pnpm drizzle:migrate    # apply to DATABASE_URL
 
 ## Scripts
