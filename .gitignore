@@ -1,37 +1,16 @@
-# Dependencies & caches
+# deps and builds
 node_modules/
-.pnpm-store/
-.npm/
-.yarn/
-.cache/
-.next/
-out/
+.svelte-kit/
 dist/
 build/
+.next/
 coverage/
-.vscode/
-.idea/
 *.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-# Tests/artifacts
-.cypress/
-cypress/screenshots/
-cypress/videos/
-.playwright/
-
-# Env & secrets
+# env/secrets
 .env
 .env.*.local
 *.local
 
-# Uploads/binaries (keep if you need them; otherwise use LFS)
-uploads/
-public/uploads/
-
-# OS cruft
+# misc
 .DS_Store
-Thumbs.db
