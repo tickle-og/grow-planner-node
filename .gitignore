@@ -13,3 +13,7 @@ coverage/
 # security tools & reports
 gitleaks
 gitleaks.json
+
+# security tools & reports
+gitleaks/
+gitleaks.json
