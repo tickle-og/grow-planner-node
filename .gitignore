@@ -9,3 +9,7 @@ coverage/
 *.local
 .DS_Store
 .data/
+
+# security tools & reports
+gitleaks
+gitleaks.json
