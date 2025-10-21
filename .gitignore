@@ -1,16 +1,12 @@
-# deps and builds
 node_modules/
 .svelte-kit/
 dist/
 build/
-.next/
 coverage/
 *.log
-
-# env/secrets
 .env
 .env.*.local
 *.local
-
-# misc
 .DS_Store
+# local data shouldn't be versioned:
+.data/
