@@ -1,0 +1,29 @@
+{
+	"/": [
+		"src/routes/+page.server.ts"
+	],
+	"/api/dev/seed": [
+		"src/routes/api/dev/seed/+server.ts"
+	],
+	"/batches": [
+		"src/routes/batches/+page.server.ts"
+	],
+	"/batches/new": [
+		"src/routes/batches/new/+page.server.ts"
+	],
+	"/batches/[id]": [
+		"src/routes/batches/[id]/+page.server.ts"
+	],
+	"/calendar": [
+		"src/routes/calendar/+page.server.ts"
+	],
+	"/recipes": [
+		"src/routes/recipes/+page.server.ts"
+	],
+	"/recipes/new": [
+		"src/routes/recipes/new/+page.server.ts"
+	],
+	"/recipes/[id]": [
+		"src/routes/recipes/[id]/+page.server.ts"
+	]
+}
