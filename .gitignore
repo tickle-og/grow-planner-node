@@ -8,5 +8,5 @@ coverage/
 .env.*.local
 *.local
 .DS_Store
-# local data shouldn't be versioned:
+# local data should not be versioned:
 .data/
