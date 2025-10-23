@@ -79,3 +79,29 @@ snapshots/
 # misc generated
 *.off
 .DS_Store
+dev.db
+backups/
+snapshots/
+*.tar.gz
+.env
+.env.*
+node_modules/
+dist/
+build/
+.DS_Store
+# local db + archives
+dev.db
+backups/
+snapshots/
+*.tar.gz
+
+# env + build
+.env
+.env.*
+node_modules/
+dist/
+build/
+
+# misc
+.DS_Store
+*.off
