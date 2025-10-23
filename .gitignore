@@ -60,3 +60,22 @@ coverage/
 gitleaks/
 gitleaks.json
 trufflehog.json
+# Node / tooling
+node_modules/
+pnpm-lock.yaml
+dist/
+build/
+
+# env
+.env
+.env.*
+
+# local db + archives
+dev.db
+backups/
+snapshots/
+*.tar.gz
+
+# misc generated
+*.off
+.DS_Store
