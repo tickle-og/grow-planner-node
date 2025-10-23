@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "typecheck": "svelte-kit sync && tsc --noEmit",
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
@@ -13,7 +14,6 @@
     "format": "prettier --write .",
     "lint": "prettier --check . && eslint .",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "typecheck": "tsc --noEmit",
     "test": "vitest",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "drizzle-kit migrate",
@@ -23,13 +23,17 @@
   "devDependencies": {
     "@eslint/compat": "^1.4.0",
     "@eslint/js": "^9.36.0",
+    "@opentelemetry/api": "^1.9.0",
     "@sveltejs/adapter-auto": "^6.1.0",
     "@sveltejs/kit": "^2.43.2",
     "@sveltejs/vite-plugin-svelte": "^6.2.0",
     "@tailwindcss/vite": "^4.1.14",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22",
+    "@vite-pwa/assets-generator": "^1.0.2",
     "@vite-pwa/sveltekit": "^1.0.1",
     "autoprefixer": "^10.4.21",
+    "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.5",
     "eslint": "^9.36.0",
     "eslint-config-prettier": "^10.1.8",
@@ -48,6 +52,7 @@
   "dependencies": {
     "@libsql/client": "^0.15.15",
     "@paralleldrive/cuid2": "^2.2.2",
+    "better-sqlite3": "^12.4.1",
     "drizzle-orm": "^0.44.6",
     "zod": "^4.1.12"
   },

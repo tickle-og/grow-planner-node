@@ -1,9 +1,20 @@
-// src/routes/recipes/+page.server.ts
 import type { PageServerLoad } from './$types';
-import { db, schema } from '$lib/db/drizzle';
-import { asc } from 'drizzle-orm';
+import { db } from '$lib/db/drizzle';
+import { recipes } from '$lib/db/schema';
+import { sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-  const recipes = await db.select().from(schema.recipes).orderBy(asc(schema.recipes.name)).all();
-  return { recipes };
+  // ORDER BY name, case-insensitive (SQLite)
+  const list = await db
+    .select({
+      id: recipes.id,
+      name: recipes.name,
+      type: recipes.type,
+      version: recipes.version,
+      isDefault: recipes.isDefault,
+    })
+    .from(recipes)
+    .orderBy(sql`name collate nocase`);
+
+  return { list };
 };
