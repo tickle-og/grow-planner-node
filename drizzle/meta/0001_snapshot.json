@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "85537d06-f7d0-4e64-9e66-267dfda41406",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "bb94c7c4-b299-4046-b0cf-fb28176c4a37",
+  "prevId": "85537d06-f7d0-4e64-9e66-267dfda41406",
   "tables": {
     "audit_log": {
       "name": "audit_log",
@@ -85,7 +85,7 @@
           "name": "happened_at",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "note": {
@@ -123,14 +123,14 @@
           "name": "strain_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "recipe_id": {
           "name": "recipe_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "culture_id": {
@@ -144,47 +144,43 @@
           "name": "tek",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "vessel": {
           "name": "vessel",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "vessel_count": {
           "name": "vessel_count",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 1
+          "notNull": false,
+          "autoincrement": false
         },
         "substrate_weight_g": {
           "name": "substrate_weight_g",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         },
         "spawn_ratio": {
           "name": "spawn_ratio",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0.2
+          "notNull": false,
+          "autoincrement": false
         },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'planned'"
+          "notNull": false,
+          "autoincrement": false
         },
         "planned_at": {
           "name": "planned_at",
@@ -308,7 +304,7 @@
           "name": "version",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false,
           "default": 1
         },
@@ -318,7 +314,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         }
       },
       "indexes": {},
@@ -341,24 +337,22 @@
           "name": "supply_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "needed_qty": {
           "name": "needed_qty",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         },
         "added_at": {
           "name": "added_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": "CURRENT_TIMESTAMP"
+          "autoincrement": false
         },
         "resolved_at": {
           "name": "resolved_at",
@@ -406,15 +400,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "species_name_unique": {
-          "name": "species_name_unique",
-          "columns": [
-            "name"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -434,7 +420,7 @@
           "name": "species_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "name": {
@@ -493,14 +479,14 @@
           "name": "unit",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "on_hand_qty": {
           "name": "on_hand_qty",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false,
           "default": 0
         },
@@ -508,9 +494,8 @@
           "name": "cost_per_unit",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         },
         "vendor": {
           "name": "vendor",
@@ -538,8 +523,7 @@
           "type": "real",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": 0
+          "autoincrement": false
         },
         "notes": {
           "name": "notes",
@@ -549,15 +533,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "supplies_name_unique": {
-          "name": "supplies_name_unique",
-          "columns": [
-            "name"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -577,7 +553,7 @@
           "name": "user_id",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "grow_id": {
@@ -591,7 +567,7 @@
           "name": "title",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "due_at": {
@@ -620,8 +596,7 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
-          "autoincrement": false,
-          "default": 0
+          "autoincrement": false
         }
       },
       "indexes": {},
@@ -658,14 +633,14 @@
           "name": "password_hash",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "role": {
           "name": "role",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false,
           "default": "'user'"
         },
@@ -709,22 +684,7 @@
           "default": "CURRENT_TIMESTAMP"
         }
       },
-      "indexes": {
-        "users_username_unique": {
-          "name": "users_username_unique",
-          "columns": [
-            "username"
-          ],
-          "isUnique": true
-        },
-        "users_email_unique": {
-          "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -751,7 +711,7 @@
           "name": "flush_number",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false,
           "default": 1
         },
@@ -759,17 +719,15 @@
           "name": "wet_g",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         },
         "dry_g": {
           "name": "dry_g",
           "type": "real",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         },
         "harvested_at": {
           "name": "harvested_at",

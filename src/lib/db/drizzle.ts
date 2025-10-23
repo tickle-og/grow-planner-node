@@ -1,10 +1,10 @@
-// src/lib/db/drizzle.ts
-import { createClient } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql';
-import * as schema from './schema.js';
+import { createClient } from "@libsql/client/node";
+import { drizzle } from "drizzle-orm/libsql";
+import { env } from "$lib/env";
+import * as schema from "$lib/db/schema";
 
-// IMPORTANT: Use the same URL here and in drizzle.config.ts
-const client = createClient({ url: 'file:./.data/grow-planner.db' });
-
+export const client = createClient({ url: env.DATABASE_URL });
 export const db = drizzle(client, { schema });
+
+// Re-export for convenience where legacy code expects it
 export { schema };
