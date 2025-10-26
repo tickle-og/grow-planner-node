@@ -1,16 +1,11 @@
-// drizzle.config.ts
-import { defineConfig } from 'drizzle-kit';
-import { config as loadEnv } from 'dotenv';
+import 'dotenv/config';
+import type { Config } from 'drizzle-kit';
 
-loadEnv({ path: '.env' }); // populate process.env for the CLI
-
-const url = process.env.DATABASE_URL || 'file:./.data/grow-planner.db';
-
-export default defineConfig({
+export default {
   schema: './src/lib/db/schema.ts',
   out: './drizzle',
   dialect: 'sqlite',
-  dbCredentials: { url },
-  strict: true,
+  dbCredentials: { url: process.env.DATABASE_URL! },
   verbose: true,
-});
+  strict: true,
+} satisfies Config;
