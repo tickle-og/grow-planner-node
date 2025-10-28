@@ -1,50 +1,52 @@
-import type { Actions, PageServerLoad } from './$types';
-import { db } from '$lib/db/drizzle';
-import { tasks, grows } from '$lib/db/schema';
-import { eq, and, lt, gte, lte } from 'drizzle-orm';
+// src/routes/+page.server.ts
+import type { PageServerLoad } from "./$types";
+import { db } from "$lib/db/drizzle";
+import { locations, locationMembers } from "$lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
-const now = () => Date.now();
+async function resolveLocationId(event: Parameters<PageServerLoad>[0]): Promise<number | null> {
+  const fromQuery = Number(event.url.searchParams.get("location_id"));
+  if (Number.isFinite(fromQuery) && fromQuery > 0) return fromQuery;
 
-export const load: PageServerLoad = async () => {
-  const n = now();
-  const end48h = n + 48 * 60 * 60 * 1000;
+  const fromCookie = Number(event.cookies.get("location_id"));
+  if (Number.isFinite(fromCookie) && fromCookie > 0) return fromCookie;
 
-  // join tasks -> grows to show batch name
-  const base = db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      dueAt: tasks.dueAt,
-      batchId: tasks.batchId,
-      batchName: grows.name,
-    })
-    .from(tasks)
-    .leftJoin(grows, eq(grows.id, tasks.batchId))
-    .where(eq(tasks.status, 'pending'));
+  const uid = event.locals.user?.id ?? 1;
+  const membership = await db
+    .select({ id: locations.id })
+    .from(locationMembers)
+    .innerJoin(locations, eq(locations.id, locationMembers.locationId))
+    .where(and(eq(locationMembers.userId, uid), eq(locations.isActive, true)))
+    .limit(1);
 
-  const [overdue, dueToday, upcoming] = await Promise.all([
-    base.clone().where(and(eq(tasks.status, 'pending'), lt(tasks.dueAt, n))).orderBy(tasks.dueAt),
-    base.clone().where(and(gte(tasks.dueAt, n), lte(tasks.dueAt, n + 24 * 60 * 60 * 1000))).orderBy(tasks.dueAt),
-    base.clone().where(and(gte(tasks.dueAt, n + 24 * 60 * 60 * 1000), lte(tasks.dueAt, end48h))).orderBy(tasks.dueAt),
-  ]);
+  if (membership[0]?.id) return membership[0].id;
 
-  return { overdue, dueToday, upcoming };
-};
+  const anyLoc = await db.select({ id: locations.id }).from(locations).limit(1);
+  return anyLoc[0]?.id ?? null;
+}
 
-export const actions: Actions = {
-  complete: async ({ request }) => {
-    const form = await request.formData();
-    const id = String(form.get('id') ?? '');
-    if (!id) return { ok: false, error: 'Missing id' };
-    await db.update(tasks).set({ status: 'done', completedAt: Date.now() }).where(eq(tasks.id, id));
-    return { ok: true };
-  },
-  snooze: async ({ request }) => {
-    const form = await request.formData();
-    const id = String(form.get('id') ?? '');
-    const minutes = Number(form.get('minutes') ?? 60);
-    if (!id) return { ok: false, error: 'Missing id' };
-    await db.update(tasks).set({ dueAt: Date.now() + minutes * 60_000 }).where(eq(tasks.id, id));
-    return { ok: true };
-  },
+export const load: PageServerLoad = async (event) => {
+  const locationId = await resolveLocationId(event);
+
+  if (!locationId) return { locationId: null };
+
+  event.cookies.set("location_id", String(locationId), {
+    path: "/", httpOnly: false, sameSite: "lax", maxAge: 60 * 60 * 24 * 365
+  });
+
+  const qs = `?location_id=${locationId}`;
+  const [statusCounts, activeGrows, lowStock, recentYields, activity, nextActions, shelfUtil, recentNotes, assetLocations] =
+    await Promise.all([
+      event.fetch(`/api/dashboard/status-counts${qs}`).then(r => r.json()),
+      event.fetch(`/api/dashboard/active-grows${qs}&limit=8`).then(r => r.json()),
+      event.fetch(`/api/dashboard/low-stock${qs}`).then(r => r.json()),
+      event.fetch(`/api/dashboard/recent-yields${qs}&days=30`).then(r => r.json()),
+      event.fetch(`/api/dashboard/activity${qs}&days=14&limit=20`).then(r => r.json()),
+      event.fetch(`/api/dashboard/next-actions${qs}&limit=20`).then(r => r.json()),
+      event.fetch(`/api/dashboard/shelf-utilization${qs}`).then(r => r.json()),
+      event.fetch(`/api/dashboard/recent-notes${qs}`).then(r => r.json()).catch(() => ({ rows: [] })),
+      event.fetch(`/api/dashboard/asset-locations${qs}`).then(r => r.json()).catch(() => ({ bins: [], assignments: [] })),
+    ]);
+
+  return { locationId, statusCounts, activeGrows, lowStock, recentYields, activity, nextActions, shelfUtil, recentNotes, assetLocations };
 };
