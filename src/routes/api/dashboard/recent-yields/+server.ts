@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
 import { yieldData, grows } from "$lib/db/schema";
@@ -34,9 +38,9 @@ export const GET: RequestHandler = async (event) => {
       return acc;
     }, { wetWeightG: 0, dryWeightG: 0 });
 
-    return new Response(JSON.stringify({ locationId, days, totals, rows }), { headers: { "content-type": "application/json" }});
+    return json({ locationId, days, totals, rows }, 200);
   } catch (err: any) {
     console.error("GET /api/dashboard/recent-yields:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };

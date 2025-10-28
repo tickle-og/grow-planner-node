@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 // src/routes/api/dashboard/status-counts/+server.ts
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
@@ -25,11 +29,9 @@ export const GET: RequestHandler = async (event) => {
       failed: (breakdown.contaminated ?? 0) + (breakdown.retired ?? 0) + (breakdown.failed ?? 0),
     };
 
-    return new Response(JSON.stringify({ locationId, total, breakdown, groups }), {
-      headers: { "content-type": "application/json" }
-    });
+    return json({ locationId, total, breakdown, groups }, 200);
   } catch (err: any) {
     console.error("GET /api/dashboard/status-counts:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };

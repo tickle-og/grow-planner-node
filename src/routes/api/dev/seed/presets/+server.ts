@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 // src/routes/api/dev/seed/presets/+server.ts
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
@@ -91,14 +95,6 @@ export const POST: RequestHandler = async () => {
       .select({ count: sql<number>`COUNT(*)` })
       .from(jarVariants);
 
-    return new Response(JSON.stringify({
-      ok: true,
-      inserted: { container_presets: presetInserted, jar_variants: jarInserted },
-      skipped:  { container_presets: presetSkipped,  jar_variants: jarSkipped },
-      totals:   { container_presets: Number(totalPresets), jar_variants: Number(totalJars) }
-    }), { headers: { "content-type": "application/json" }});
-  } catch (err: any) {
-    console.error("ERROR /api/dev/seed/presets:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json" }});
+    return jsonError(500);
   }
 };

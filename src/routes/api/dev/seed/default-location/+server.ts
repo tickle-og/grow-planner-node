@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
 import { locations, locationMembers, users } from "$lib/db/schema";
@@ -28,9 +32,9 @@ export const POST: RequestHandler = async ({ request }) => {
       await db.insert(locationMembers).values({ locationId: locId, userId: ownerUserId, memberRole: "owner" } as any);
     }
 
-    return new Response(JSON.stringify({ ok: true, location_id: locId }), { headers: { "content-type": "application/json" }});
+    return json({ ok: true, location_id: locId }, 200);
   } catch (err: any) {
     console.error("ERROR /api/dev/seed/default-location:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };

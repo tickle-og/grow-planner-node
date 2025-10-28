@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 // src/routes/api/dashboard/recent-notes/+server.ts
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
@@ -39,9 +43,9 @@ export const GET: RequestHandler = async (event) => {
     parts.sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
     parts = parts.slice(0, 10);
 
-    return new Response(JSON.stringify({ locationId, rows: parts }), { headers: { "content-type": "application/json" }});
+    return json({ locationId, rows: parts }, 200);
   } catch (err: any) {
     console.error("GET /api/dashboard/recent-notes:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };

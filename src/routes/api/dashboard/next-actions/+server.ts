@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
 import { grows } from "$lib/db/schema";
@@ -46,11 +50,6 @@ export const GET: RequestHandler = async (event) => {
       }
     }
 
-    return new Response(JSON.stringify({ locationId, count: actions.length, actions: actions.slice(0, limit) }), {
-      headers: { "content-type": "application/json" }
-    });
-  } catch (err: any) {
-    console.error("GET /api/dashboard/next-actions:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };

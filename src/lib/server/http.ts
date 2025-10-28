@@ -1,4 +1,4 @@
-// src/lib/server/http.ts
+// Lightweight JSON helpers for consistent responses
 export function json(data: unknown, status = 200, cache = 'no-store') {
   return new Response(JSON.stringify(data), {
     status,

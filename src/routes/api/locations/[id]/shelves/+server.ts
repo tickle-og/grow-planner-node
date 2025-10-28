@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 import type { RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/db/drizzle';
 import { locationShelves, locations } from '$lib/db/schema';
@@ -10,9 +14,9 @@ export const GET: RequestHandler = async ({ params }) => {
       .select()
       .from(locationShelves)
       .where(eq(locationShelves.locationId, locationId));
-    return new Response(JSON.stringify(rows), { status: 200 });
+    return json(rows, 200);
   } catch (e: any) {
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };
 
@@ -22,31 +26,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
     // 1) verify the location exists (prevents FK surprises)
     const [loc] = await db.select().from(locations).where(eq(locations.id, locationId)).limit(1);
     if (!loc) {
-      return new Response(
-        JSON.stringify({ ok: false, error: `location ${locationId} not found in this database` }),
-        { status: 404 }
-      );
-    }
-
-    // 2) create shelf
-    const body = await request.json();
-    const { label, lengthCm, widthCm, heightCm, levels = 1 } = body ?? {};
-    if (!label) return new Response(JSON.stringify({ ok: false, error: 'label required' }), { status: 400 });
-
-    const [row] = await db
-      .insert(locationShelves)
-      .values({
-        locationId,
-        label,
-        lengthCm: lengthCm ?? null,
-        widthCm: widthCm ?? null,
-        heightCm: heightCm ?? null,
-        levels: levels ?? 1
-      })
-      .returning({ id: locationShelves.id });
-
-    return new Response(JSON.stringify({ ok: true, id: row?.id }), { status: 201 });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+      return jsonError(500);
   }
 };

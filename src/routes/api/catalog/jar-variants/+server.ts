@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
 import { jarVariants } from "$lib/db/schema";
@@ -8,9 +12,9 @@ export const GET: RequestHandler = async () => {
       .select()
       .from(jarVariants)
       .orderBy(jarVariants.sizeMl, jarVariants.mouth, jarVariants.label);
-    return new Response(JSON.stringify(rows), { headers: { "content-type": "application/json" }});
+    return json(rows, 200, 'public, max-age=60');
   } catch (err: any) {
     console.error("GET /api/catalog/jar-variants:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };

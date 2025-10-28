@@ -1,3 +1,7 @@
+import { json, jsonError } from '$lib/server/http';
+
+import { json, jsonError } from '$lib/server/http';
+
 import type { RequestHandler } from "./$types";
 import { db } from "$lib/db/drizzle";
 import { grows, cultures, recipes } from "$lib/db/schema";
@@ -34,9 +38,9 @@ export const GET: RequestHandler = async (event) => {
       .orderBy(sql`COALESCE(${grows.updatedAt}, ${grows.startDate}) DESC`)
       .limit(limit);
 
-    return new Response(JSON.stringify({ locationId, rows }), { headers: { "content-type": "application/json" }});
+    return json({ locationId, rows }, 200);
   } catch (err: any) {
     console.error("GET /api/dashboard/active-grows:", err);
-    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+    return jsonError(500);
   }
 };
