@@ -37,6 +37,6 @@ export const GET: RequestHandler = async (event) => {
     return new Response(JSON.stringify({ locationId, rows }), { headers: { "content-type": "application/json" }});
   } catch (err: any) {
     console.error("GET /api/dashboard/active-grows:", err);
-    return new Response(JSON.stringify({ message: "Internal Error", detail: String(err?.message ?? err) }), { status: 500 });
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
   }
 };

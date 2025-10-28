@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ params }) => {
       .where(eq(locationShelves.locationId, locationId));
     return new Response(JSON.stringify(rows), { status: 200 });
   } catch (e: any) {
-    return new Response(JSON.stringify({ ok: false, error: e?.message, detail: e?.cause?.message }), { status: 500 });
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
   }
 };
 
@@ -47,6 +47,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
 
     return new Response(JSON.stringify({ ok: true, id: row?.id }), { status: 201 });
   } catch (e: any) {
-    return new Response(JSON.stringify({ ok: false, error: e?.message, detail: e?.cause?.message }), { status: 500 });
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
   }
 };

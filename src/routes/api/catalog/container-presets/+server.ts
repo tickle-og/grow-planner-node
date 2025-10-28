@@ -1,18 +1,33 @@
-import type { RequestHandler } from "./$types";
-import { db } from "$lib/db/drizzle";
-import { containerPresets } from "$lib/db/schema";
-import { eq } from "drizzle-orm";
+// src/routes/api/catalog/container-presets/+server.ts
+import type { RequestHandler } from '@sveltejs/kit';
+import { db } from '$lib/db/drizzle';
+import { containerPresets } from '$lib/db/schema';
 
 export const GET: RequestHandler = async () => {
   try {
     const rows = await db
-      .select()
-      .from(containerPresets)
-      .where(eq(containerPresets.active, true))
-      .orderBy(containerPresets.containerType, containerPresets.label);
-    return new Response(JSON.stringify(rows), { headers: { "content-type": "application/json" }});
-  } catch (err: any) {
-    console.error("GET /api/catalog/container-presets:", err);
-    return new Response(JSON.stringify({ message: "Internal Error", detail: String(err?.message ?? err) }), { status: 500 });
+      .select({
+        key: containerPresets.key,
+        containerType: containerPresets.containerType,
+        label: containerPresets.label,
+        defaultsJson: containerPresets.defaultsJson,
+        active: containerPresets.active
+      })
+      .from(containerPresets);
+
+    return new Response(JSON.stringify(rows), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'public, max-age=60'
+      }
+    });
+  } catch (e) {
+    // Log server-side for debugging, but don't leak to the client
+    console.error('GET /api/catalog/container-presets failed:', e);
+    return new Response(JSON.stringify({ message: "Internal Error" }), {
+      status: 500,
+      headers: { 'content-type': 'application/json; charset=utf-8' }
+    });
   }
 };

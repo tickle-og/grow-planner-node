@@ -31,6 +31,6 @@ export const POST: RequestHandler = async ({ request }) => {
     return new Response(JSON.stringify({ ok: true, location_id: locId }), { headers: { "content-type": "application/json" }});
   } catch (err: any) {
     console.error("ERROR /api/dev/seed/default-location:", err);
-    return new Response(JSON.stringify({ message: "Internal Error", detail: String(err?.message ?? err) }), { status: 500 });
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
   }
 };

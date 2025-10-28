@@ -11,6 +11,6 @@ export const GET: RequestHandler = async () => {
     return new Response(JSON.stringify(rows), { headers: { "content-type": "application/json" }});
   } catch (err: any) {
     console.error("GET /api/catalog/jar-variants:", err);
-    return new Response(JSON.stringify({ message: "Internal Error", detail: String(err?.message ?? err) }), { status: 500 });
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
   }
 };

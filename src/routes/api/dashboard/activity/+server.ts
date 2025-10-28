@@ -67,6 +67,6 @@ export const GET: RequestHandler = async (event) => {
     });
   } catch (err: any) {
     console.error("GET /api/dashboard/activity:", err);
-    return new Response(JSON.stringify({ message: "Internal Error", detail: String(err?.message ?? err) }), { status: 500 });
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
   }
 };

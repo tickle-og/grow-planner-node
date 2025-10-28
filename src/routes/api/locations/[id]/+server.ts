@@ -10,6 +10,6 @@ export const GET: RequestHandler = async ({ params }) => {
     if (!row) return new Response(JSON.stringify({ ok: false, error: 'not found' }), { status: 404 });
     return new Response(JSON.stringify(row), { status: 200 });
   } catch (e: any) {
-    return new Response(JSON.stringify({ ok: false, error: e?.message, detail: e?.cause?.message }), { status: 500 });
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
   }
 };

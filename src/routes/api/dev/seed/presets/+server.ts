@@ -99,9 +99,6 @@ export const POST: RequestHandler = async () => {
     }), { headers: { "content-type": "application/json" }});
   } catch (err: any) {
     console.error("ERROR /api/dev/seed/presets:", err);
-    return new Response(JSON.stringify({
-      message: "Internal Error",
-      detail: String(err?.message ?? err)
-    }), { status: 500, headers: { "content-type": "application/json" }});
+    return new Response(JSON.stringify({ message: "Internal Error" }), { status: 500, headers: { "content-type": "application/json" }});
   }
 };
