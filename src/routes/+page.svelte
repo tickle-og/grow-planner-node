@@ -1,297 +1,604 @@
 <!-- src/routes/+page.svelte -->
 <script lang="ts">
-  /** This page expects data from +page.server.ts which calls the dashboard APIs.
-   *  Everything is defensive so missing endpoints won't crash the UI.
-   */
-  export let data: {
-    locationId: number | null;
-    statusCounts?: {
-      locationId: number;
-      total: number;
-      breakdown: Record<string, number>;
-      message?: string;
-      detail?: string;
-    };
-    activeGrows?: { locationId: number; rows: any[]; message?: string; detail?: string };
-    lowStock?: { locationId: number; rows: any[]; message?: string; detail?: string };
-    recentYields?: {
-      locationId: number;
-      days: number;
-      totals: { wetWeightG: number; dryWeightG: number };
-      rows: any[];
-      message?: string;
-      detail?: string;
-    };
-    activity?: { locationId: number; days: number; count: number; items: any[]; message?: string; detail?: string };
-    nextActions?: { locationId: number; count: number; actions: any[]; message?: string; detail?: string };
-    shelfUtil?: {
-      locationId: number;
-      capacityCm2: number;
-      usedCm2: number;
-      percent: number;
-      itemsCounted: number;
-      shelvesCount: number;
-      message?: string;
-      detail?: string;
-    };
+  import { browser } from "$app/environment";
+  import { onMount } from "svelte";
+
+  // If your +page.server.ts passes data, we accept it. Fallback to location 1 for dev.
+  export let data: { locationId?: number } | undefined;
+  let locationId = data?.locationId ?? 1;
+
+  // ---- Utilities -----------------------------------------------------------
+  async function fetchJson<T = any>(url: string, init?: RequestInit): Promise<T | null> {
+    try {
+      if (!browser) return null;
+      const res = await fetch(url, init);
+      if (!res.ok) return null;
+      return (await res.json()) as T;
+    } catch {
+      return null;
+    }
+  }
+  const nowStamp = () => new Date().toISOString().replace("T", " ").slice(0, 19);
+
+  // ---- Status counts -------------------------------------------------------
+  type Counts = {
+    pending: number;
+    active: number;
+    completed: number;
+    failed: number;
+    allTime?: { pending: number; active: number; completed: number; failed: number };
+  };
+  let counts: Counts = { pending: 0, active: 0, completed: 0, failed: 0 };
+  let loadingCounts = true;
+
+  async function loadCounts() {
+    loadingCounts = true;
+    const c = await fetchJson<Counts>(`/api/dashboard/status-counts?location_id=${locationId}`);
+    if (c) counts = c;
+    loadingCounts = false;
+  }
+
+  // ---- Expand panels state -------------------------------------------------
+  let expanded = {
+    active: false,
+    lowStock: false,
+    yields: false,
+    tasks: false,
+    activity: false,
+    notes: false,
+    shelf: false,
+    shelfAssets: false
   };
 
-  // ---- helpers ----
-  const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : "—");
-  const grams = (n?: number | null) => `${(n ?? 0).toLocaleString()} g`;
-  const pct = (n?: number | null) => `${Math.max(0, Math.min(100, Math.round(n ?? 0)))}%`;
-  const cm2 = (n?: number | null) => `${(Math.round((n ?? 0) * 10) / 10).toLocaleString()} cm²`;
-  const hasError = (o: any) => o && o.message === "Internal Error";
+  // ---- Active grows (simple client filter) --------------------------------
+  type Grow = {
+    id: number;
+    status: string | null;
+    batchCode: string | null;
+    containerType: string | null;
+    containerPresetKey: string | null;
+    createdAt?: string | null;
+  };
+  let activeGrows: Grow[] = [];
+  let loadingActive = false;
+  let activeLoaded = false;
 
-  // Destructure with fallbacks
-  const sc = data.statusCounts ?? { total: 0, breakdown: {} as Record<string, number> };
-  const ag = data.activeGrows ?? { rows: [] as any[] };
-  const ls = data.lowStock ?? { rows: [] as any[] };
-  const ry = data.recentYields ?? { days: 30, totals: { wetWeightG: 0, dryWeightG: 0 }, rows: [] as any[] };
-  const act = data.activity ?? { days: 14, count: 0, items: [] as any[] };
-  const na = data.nextActions ?? { count: 0, actions: [] as any[] };
-  const su = data.shelfUtil ?? { capacityCm2: 0, usedCm2: 0, percent: 0, itemsCounted: 0, shelvesCount: 0 };
+  async function loadMoreActive() {
+    if (!browser || activeLoaded || loadingActive) return;
+    loadingActive = true;
+    const rows = await fetchJson<Grow[]>(`/api/grows?location_id=${locationId}`);
+    activeGrows =
+      rows?.filter((g) => g?.status && ["incubating", "fruiting", "active"].includes(g.status)) ?? [];
+    activeLoaded = true;
+    loadingActive = false;
+  }
 
-  // Avoid Svelte interpreting JSON braces inside markup: render this via a string variable.
-  const quickStartCmd =
-    `curl -X POST http://localhost:5173/api/dev/seed/default-location ` +
-    `-H "content-type: application/json" ` +
-    `-d '{"owner_user_id":1,"name":"Default Lab","timezone":"America/Denver"}'`;
+  // ---- Low stock supplies (optional endpoint; safe if missing) ------------
+  type Supply = {
+    id: number;
+    name?: string;
+    sku?: string | null;
+    inStockQty?: number | null;
+    reorderPoint?: number | null;
+  };
+  let lowStock: Supply[] = [];
+  let loadingLowStock = false;
+  let lowStockLoaded = false;
+
+  async function loadMoreLowStock() {
+    if (!browser || lowStockLoaded || loadingLowStock) return;
+    loadingLowStock = true;
+    // If you haven't wired a route, this will simply resolve null and keep array empty.
+    const rows = await fetchJson<Supply[]>(`/api/supplies?location_id=${locationId}&low_stock=1`);
+    lowStock = rows ?? [];
+    lowStockLoaded = true;
+    loadingLowStock = false;
+  }
+
+  // ---- Recent yields (optional; safe if missing) ---------------------------
+  type YieldRow = {
+    id: number;
+    growId?: number | null;
+    weightG?: number | null;
+    qualityGrade?: string | null;
+    createdAt?: string | null;
+  };
+  let recentYields: YieldRow[] = [];
+  let loadingYields = false;
+  let yieldsLoaded = false;
+
+  async function loadMoreYields() {
+    if (!browser || yieldsLoaded || loadingYields) return;
+    loadingYields = true;
+    const rows = await fetchJson<YieldRow[]>(`/api/dashboard/recent-yields?location_id=${locationId}`);
+    recentYields = rows ?? [];
+    yieldsLoaded = true;
+    loadingYields = false;
+  }
+
+  // ---- Upcoming tasks (previously Next Actions) ----------------------------
+  type TaskRow = {
+    id: number;
+    dueAt?: string | null;
+    title?: string | null;
+    growId?: number | null;
+  };
+  let tasks: TaskRow[] = [];
+  let loadingTasks = false;
+  let tasksLoaded = false;
+
+  async function loadMoreTasks() {
+    if (!browser || tasksLoaded || loadingTasks) return;
+    loadingTasks = true;
+    const rows = await fetchJson<TaskRow[]>(`/api/dashboard/upcoming-tasks?location_id=${locationId}`);
+    tasks = rows ?? [];
+    tasksLoaded = true;
+    loadingTasks = false;
+  }
+
+  // ---- Recent activity (optional) -----------------------------------------
+  type ActivityRow = {
+    id: number;
+    at?: string | null;
+    kind?: string | null;
+    ref?: string | null;
+    note?: string | null;
+  };
+  let activity: ActivityRow[] = [];
+  let loadingActivity = false;
+  let activityLoaded = false;
+
+  async function loadMoreActivity() {
+    if (!browser || activityLoaded || loadingActivity) return;
+    loadingActivity = true;
+    const rows = await fetchJson<ActivityRow[]>(`/api/dashboard/recent-activity?location_id=${locationId}`);
+    activity = rows ?? [];
+    activityLoaded = true;
+    loadingActivity = false;
+  }
+
+  // ---- Recent notes: last 10 entries with note text -----------------------
+  type NoteRow = { id: number; at?: string | null; source?: string | null; note?: string | null };
+  let recentNotes: NoteRow[] = [];
+  let loadingNotes = false;
+  let notesLoaded = false;
+
+  async function loadRecentNotes() {
+    if (!browser || notesLoaded || loadingNotes) return;
+    loadingNotes = true;
+    const rows = await fetchJson<NoteRow[]>(`/api/dashboard/recent-notes?location_id=${locationId}`);
+    recentNotes = rows ?? [];
+    notesLoaded = true;
+    loadingNotes = false;
+  }
+
+  // ---- Shelf utilization (capacity vs used) --------------------------------
+  type ShelfUtil = {
+    capacityCm2: number;
+    usedCm2: number;
+    percent: number; // 0..100
+    itemsCounted: number;
+    shelvesCount: number;
+  };
+  let shelfUtil: ShelfUtil | null = null;
+  let loadingShelf = false;
+  let shelfLoaded = false;
+
+  async function loadShelf() {
+    if (!browser || shelfLoaded || loadingShelf) return;
+    loadingShelf = true;
+    const res = await fetchJson<ShelfUtil>(`/api/dashboard/shelf-utilization?location_id=${locationId}`);
+    shelfUtil = res ?? { capacityCm2: 0, usedCm2: 0, percent: 0, itemsCounted: 0, shelvesCount: 0 };
+    shelfLoaded = true;
+    loadingShelf = false;
+  }
+
+  // ---- Asset locations (bins & groups) ------------------------------------
+  type BinRow = { id: number; label: string; shelfId: number | null; shelfLabel?: string | null; count?: number };
+  type AssignmentRow = { binId: number; growId: number | null; groupLabel?: string | null };
+  let bins: BinRow[] = [];
+  let assignments: AssignmentRow[] = [];
+  let loadingAssets = false;
+  let assetsLoaded = false;
+
+  async function loadAssetLocations() {
+    if (!browser || assetsLoaded || loadingAssets) return;
+    loadingAssets = true;
+    const res = await fetchJson<{ bins: BinRow[]; assignments: AssignmentRow[] }>(
+      `/api/dashboard/asset-locations?location_id=${locationId}`
+    );
+    bins = res?.bins ?? [];
+    assignments = res?.assignments ?? [];
+    assetsLoaded = true;
+    loadingAssets = false;
+  }
+
+  // ---- Reactive watchers (browser only) -----------------------------------
+  $: if (browser && expanded.active) loadMoreActive();
+  $: if (browser && expanded.lowStock) loadMoreLowStock();
+  $: if (browser && expanded.yields) loadMoreYields();
+  $: if (browser && expanded.tasks) loadMoreTasks();
+  $: if (browser && expanded.activity) loadMoreActivity();
+  $: if (browser && expanded.notes) loadRecentNotes();
+  $: if (browser && expanded.shelf) loadShelf();
+  $: if (browser && expanded.shelfAssets) loadAssetLocations();
+
+  // ---- Initial load on mount ----------------------------------------------
+  onMount(async () => {
+    if (!locationId) return;
+    await loadCounts();
+  });
 </script>
 
-<svelte:head>
-  <title>Dashboard</title>
-</svelte:head>
-
-{#if !data.locationId}
-  <section class="p-6 max-w-4xl mx-auto">
-    <h1 class="text-2xl font-bold mb-2">Welcome to Grow Planner</h1>
-    <p class="opacity-70 mb-6">
-      No location found yet. Create a location to light up your dashboard.
-    </p>
-    <div class="rounded-xl border p-4 bg-gray-50">
-      <p class="mb-2 font-medium">Quick start (dev):</p>
-      <pre class="text-sm overflow-auto p-3 bg-white rounded-lg border"><code>{quickStartCmd}</code></pre>
-      <p class="mt-3 text-sm opacity-70">Then refresh this page.</p>
+<!-- Page -->
+<div class="mx-auto max-w-7xl p-6 space-y-8">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">Dashboard</h1>
+      <p class="text-sm text-muted-foreground">Location #{locationId} • {nowStamp()}</p>
     </div>
-  </section>
-{:else}
-  <section class="p-6 space-y-8">
-    <!-- Header -->
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold">Dashboard</h1>
-        <p class="text-sm opacity-70">Location ID: {data.locationId}</p>
+    <div class="flex items-center gap-2">
+      <button
+        class="rounded-xl border px-3 py-2 text-sm hover:bg-muted"
+        on:click={() => loadCounts()}
+        aria-label="Refresh"
+        title="Refresh">
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Status cards (high-contrast) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Pending -->
+    <div class="rounded-2xl border bg-amber-50 border-amber-200 p-4 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-amber-900">Pending</h3>
+        <span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800">All time</span>
       </div>
-      <!-- Placeholder for a future Location switcher -->
-      <div class="flex items-center gap-2">
-        <span class="text-sm opacity-70">Switch location</span>
-        <select class="border rounded-lg px-3 py-2 text-sm opacity-70 pointer-events-none">
-          <option selected>Coming soon</option>
-        </select>
-      </div>
+      <p class="mt-2 text-3xl font-semibold text-amber-700">
+        {loadingCounts ? '—' : counts.pending}
+      </p>
     </div>
 
-    <!-- Status summary cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      <div class="rounded-xl border p-4">
-        <div class="text-sm opacity-70">Total Grows</div>
-        <div class="text-3xl font-semibold">{sc.total ?? 0}</div>
-        {#if hasError(data.statusCounts)}
-          <div class="mt-2 text-xs text-red-600">{data.statusCounts?.detail}</div>
-        {/if}
+    <!-- Active -->
+    <div class="rounded-2xl border bg-emerald-600 border-emerald-700 p-4 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-white">Active</h3>
+        <span class="px-2 py-0.5 text-xs rounded-full bg-white/20 text-white">All time</span>
       </div>
+      <p class="mt-2 text-3xl font-semibold text-white">
+        {loadingCounts ? '—' : counts.active}
+      </p>
+    </div>
 
-      {#each Object.entries(sc.breakdown ?? {}) as [status, count]}
-        <div class="rounded-xl border p-4">
-          <div class="text-sm opacity-70 capitalize">{status.replaceAll('_',' ')}</div>
-          <div class="text-3xl font-semibold">{count}</div>
+    <!-- Completed -->
+    <div class="rounded-2xl border bg-sky-600 border-sky-700 p-4 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-white">Completed</h3>
+        <span class="px-2 py-0.5 text-xs rounded-full bg-white/20 text-white">All time</span>
+      </div>
+      <p class="mt-2 text-3xl font-semibold text-white">
+        {loadingCounts ? '—' : counts.completed}
+      </p>
+    </div>
+
+    <!-- Failed -->
+    <div class="rounded-2xl border bg-rose-600 border-rose-700 p-4 shadow-sm">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-white">Failed</h3>
+        <span class="px-2 py-0.5 text-xs rounded-full bg-white/20 text-white">All time</span>
+      </div>
+      <p class="mt-2 text-3xl font-semibold text-white">
+        {loadingCounts ? '—' : counts.failed}
+      </p>
+    </div>
+  </div>
+
+  <!-- Expandable panels -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Active Grows -->
+    <section class="rounded-2xl border bg-card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Active Grows</h2>
+          <p class="text-xs text-muted-foreground">Incubating or fruiting</p>
         </div>
-      {/each}
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          on:click={() => (expanded.active = !expanded.active)}>
+          {expanded.active ? "Collapse" : "Expand"}
+        </button>
+      </div>
 
-      {#if Object.keys(sc.breakdown ?? {}).length === 0}
-        <div class="rounded-xl border p-4 col-span-full">
-          <div class="text-sm opacity-70">No grows yet. Create your first grow to see status breakdown.</div>
-        </div>
-      {/if}
-    </div>
-
-    <!-- Two-column: Active grows & Low stock -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-      <section class="rounded-xl border">
-        <header class="p-4 border-b flex items-center justify-between">
-          <h2 class="font-semibold">Active Grows</h2>
-          <span class="text-xs opacity-70">{ag.rows?.length ?? 0} showing</span>
-        </header>
-        <div class="divide-y">
-          {#if hasError(data.activeGrows)}
-            <div class="p-4 text-sm text-red-600">{data.activeGrows?.detail}</div>
-          {:else if (ag.rows?.length ?? 0) === 0}
-            <div class="p-4 text-sm opacity-70">No active grows.</div>
+      {#if expanded.active}
+        <div class="mt-4">
+          {#if loadingActive}
+            <div class="text-sm text-muted-foreground">Loading…</div>
+          {:else if activeGrows.length === 0}
+            <div class="text-sm text-muted-foreground">No active grows.</div>
           {:else}
-            {#each ag.rows as g}
-              <div class="p-4 flex items-start justify-between gap-4">
-                <div>
-                  <div class="font-medium">{g.batchCode || `Grow #${g.id}`}</div>
-                  <div class="text-xs opacity-70 capitalize">{g.status || 'unknown'}</div>
-                  <div class="text-xs opacity-70">Start: {fmtDate(g.startDate)} • Fruiting: {fmtDate(g.movedToFruitingAt)}</div>
-                </div>
-                <div class="text-xs opacity-70 text-right">
-                  <div>Container: {g.containerType || '—'}</div>
-                  <div>Updated: {fmtDate(g.updatedAt)}</div>
-                </div>
-              </div>
-            {/each}
+            <ul class="space-y-2">
+              {#each activeGrows as g}
+                <li class="rounded-lg border p-3 flex items-center justify-between">
+                  <div>
+                    <div class="text-sm font-medium">{g.batchCode ?? `Grow #${g.id}`}</div>
+                    <div class="text-xs text-muted-foreground">
+                      {g.status} • {g.containerType ?? g.containerPresetKey}
+                    </div>
+                  </div>
+                  <div class="text-xs text-muted-foreground">{g.createdAt ?? ""}</div>
+                </li>
+              {/each}
+            </ul>
           {/if}
         </div>
-      </section>
+      {/if}
+    </section>
 
-      <section class="rounded-xl border">
-        <header class="p-4 border-b flex items-center justify-between">
-          <h2 class="font-semibold">Low Stock</h2>
-          <span class="text-xs opacity-70">{ls.rows?.length ?? 0} items</span>
-        </header>
-        {#if hasError(data.lowStock)}
-          <div class="p-4 text-sm text-red-600">{data.lowStock?.detail}</div>
-        {:else if (ls.rows?.length ?? 0) === 0}
-          <div class="p-4 text-sm opacity-70">No low-stock items.</div>
-        {:else}
-          <div class="overflow-auto">
-            <table class="min-w-full text-sm">
-              <thead>
-                <tr class="text-left border-b">
-                  <th class="px-4 py-2">Name</th>
-                  <th class="px-4 py-2">SKU</th>
-                  <th class="px-4 py-2">In Stock</th>
-                  <th class="px-4 py-2">Reorder @</th>
-                  <th class="px-4 py-2">Supplier</th>
-                </tr>
-              </thead>
-              <tbody>
-                {#each ls.rows as s}
-                  <tr class="border-b">
-                    <td class="px-4 py-2">{s.name}</td>
-                    <td class="px-4 py-2 opacity-70">{s.sku || '—'}</td>
-                    <td class="px-4 py-2">{s.inStockQty ?? 0}</td>
-                    <td class="px-4 py-2">{s.reorderPoint ?? 0}</td>
-                    <td class="px-4 py-2 opacity-70">{s.preferredSupplier || '—'}</td>
+    <!-- Low Stock -->
+    <section class="rounded-2xl border bg-card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Low Stock</h2>
+          <p class="text-xs text-muted-foreground">Supplies below reorder point</p>
+        </div>
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          on:click={() => (expanded.lowStock = !expanded.lowStock)}>
+          {expanded.lowStock ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {#if expanded.lowStock}
+        <div class="mt-4">
+          {#if loadingLowStock}
+            <div class="text-sm text-muted-foreground">Loading…</div>
+          {:else if lowStock.length === 0}
+            <div class="text-sm text-muted-foreground">All stocked up.</div>
+          {:else}
+            <div class="overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-xs text-muted-foreground">
+                    <th class="py-2 pr-3">Item</th>
+                    <th class="py-2 pr-3">SKU</th>
+                    <th class="py-2 pr-3">In Stock</th>
+                    <th class="py-2">Reorder Point</th>
                   </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
-        {/if}
-      </section>
-    </div>
-
-    <!-- Recent yields + Shelf utilization -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-      <section class="rounded-xl border">
-        <header class="p-4 border-b flex items-center justify-between">
-          <h2 class="font-semibold">Recent Yields (last {ry.days} days)</h2>
-          <div class="text-xs opacity-70">
-            Total: {grams(ry.totals?.wetWeightG)} wet • {grams(ry.totals?.dryWeightG)} dry
-          </div>
-        </header>
-        {#if hasError(data.recentYields)}
-          <div class="p-4 text-sm text-red-600">{data.recentYields?.detail}</div>
-        {:else if (ry.rows?.length ?? 0) === 0}
-          <div class="p-4 text-sm opacity-70">No harvests recorded.</div>
-        {:else}
-          <div class="divide-y">
-            {#each ry.rows as y}
-              <div class="p-4 flex items-center justify-between">
-                <div class="text-sm">
-                  <div class="font-medium">Grow #{y.growId} — Flush {y.flushNumber ?? '—'}</div>
-                  <div class="text-xs opacity-70">Harvest: {fmtDate(y.harvestDate)}</div>
-                </div>
-                <div class="text-right text-sm">
-                  <div>{grams(y.wetWeightG)}</div>
-                  <div class="opacity-70">{grams(y.dryWeightG)}</div>
-                </div>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </section>
-
-      <section class="rounded-xl border">
-        <header class="p-4 border-b">
-          <h2 class="font-semibold">Shelf Utilization</h2>
-        </header>
-        {#if hasError(data.shelfUtil)}
-          <div class="p-4 text-sm text-red-600">{data.shelfUtil?.detail}</div>
-        {:else}
-          <div class="p-4">
-            <div class="flex items-center justify-between text-sm mb-2">
-              <span class="opacity-70">Capacity</span>
-              <span>{cm2(su.capacityCm2)}</span>
+                </thead>
+                <tbody>
+                  {#each lowStock as s}
+                    <tr class="border-t">
+                      <td class="py-2 pr-3">{s.name ?? `Supply #${s.id}`}</td>
+                      <td class="py-2 pr-3">{s.sku ?? "—"}</td>
+                      <td class="py-2 pr-3">{s.inStockQty ?? 0}</td>
+                      <td class="py-2">{s.reorderPoint ?? 0}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
             </div>
-            <div class="flex items-center justify-between text-sm mb-2">
-              <span class="opacity-70">Used</span>
-              <span>{cm2(su.usedCm2)}</span>
-            </div>
-            <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div class="h-full bg-emerald-500" style={`width:${su.percent ?? 0}%`}></div>
-            </div>
-            <div class="mt-2 text-sm">{pct(su.percent)} utilized</div>
-            <div class="mt-1 text-xs opacity-70">
-              {su.itemsCounted} items across {su.shelvesCount} shelves
-            </div>
-          </div>
-        {/if}
-      </section>
-    </div>
-
-    <!-- Next actions -->
-    <section class="rounded-xl border">
-      <header class="p-4 border-b flex items-center justify-between">
-        <h2 class="font-semibold">Next Actions</h2>
-        <span class="text-xs opacity-70">{na.count ?? na.actions?.length ?? 0} suggestions</span>
-      </header>
-      {#if hasError(data.nextActions)}
-        <div class="p-4 text-sm text-red-600">{data.nextActions?.detail}</div>
-      {:else if ((na.actions?.length ?? 0) === 0)}
-        <div class="p-4 text-sm opacity-70">No suggested actions right now.</div>
-      {:else}
-        <ul class="divide-y">
-          {#each na.actions as a}
-            <li class="p-4 flex items-start justify-between gap-4">
-              <div class="text-sm">
-                <div class="font-medium">{a.action}</div>
-                <div class="opacity-70 text-xs">{a.reason}</div>
-              </div>
-              <div class="text-xs opacity-70">Grow #{a.growId}</div>
-            </li>
-          {/each}
-        </ul>
+          {/if}
+        </div>
       {/if}
     </section>
 
-    <!-- Activity -->
-    <section class="rounded-xl border">
-      <header class="p-4 border-b flex items-center justify-between">
-        <h2 class="font-semibold">Recent Activity (last {act.days} days)</h2>
-        <span class="text-xs opacity-70">{act.count ?? act.items?.length ?? 0} events</span>
-      </header>
-      {#if hasError(data.activity)}
-        <div class="p-4 text-sm text-red-600">{data.activity?.detail}</div>
-      {:else if ((act.items?.length ?? 0) === 0)}
-        <div class="p-4 text-sm opacity-70">No recent activity.</div>
-      {:else}
-        <ul class="divide-y">
-          {#each act.items as it}
-            <li class="p-4 flex items-center justify-between">
-              <div class="text-sm">
-                <span class="font-medium capitalize">{it.type.replaceAll('_',' ')}</span>
-                {#if it.label} <span class="opacity-70">— {it.label}</span> {/if}
-                <span class="opacity-70"> • Grow #{it.growId}</span>
-              </div>
-              <div class="text-xs opacity-70">{fmtDate(it.ts)}</div>
-            </li>
-          {/each}
-        </ul>
+    <!-- Recent Yields -->
+    <section class="rounded-2xl border bg-card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Recent Yields</h2>
+          <p class="text-xs text-muted-foreground">Latest harvest weights</p>
+        </div>
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          on:click={() => (expanded.yields = !expanded.yields)}>
+          {expanded.yields ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {#if expanded.yields}
+        <div class="mt-4">
+          {#if loadingYields}
+            <div class="text-sm text-muted-foreground">Loading…</div>
+          {:else if recentYields.length === 0}
+            <div class="text-sm text-muted-foreground">No recent yields.</div>
+          {:else}
+            <ul class="space-y-2">
+              {#each recentYields as y}
+                <li class="rounded-lg border p-3 flex items-center justify-between">
+                  <div>
+                    <div class="text-sm font-medium">Grow #{y.growId ?? "?"}</div>
+                    <div class="text-xs text-muted-foreground">{y.qualityGrade ?? "grade: n/a"}</div>
+                  </div>
+                  <div class="text-sm font-semibold">{y.weightG ?? 0} g</div>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
       {/if}
     </section>
-  </section>
-{/if}
+
+    <!-- Upcoming Tasks -->
+    <section class="rounded-2xl border bg-card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Upcoming Tasks</h2>
+          <p class="text-xs text-muted-foreground">What’s coming up next</p>
+        </div>
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          on:click={() => (expanded.tasks = !expanded.tasks)}>
+          {expanded.tasks ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {#if expanded.tasks}
+        <div class="mt-4">
+          {#if loadingTasks}
+            <div class="text-sm text-muted-foreground">Loading…</div>
+          {:else if tasks.length === 0}
+            <div class="text-sm text-muted-foreground">No tasks queued.</div>
+          {:else}
+            <ul class="space-y-2">
+              {#each tasks as t}
+                <li class="rounded-lg border p-3 flex items-center justify-between">
+                  <div>
+                    <div class="text-sm font-medium">{t.title ?? "Task"}</div>
+                    <div class="text-xs text-muted-foreground">Grow #{t.growId ?? "—"}</div>
+                  </div>
+                  <div class="text-xs text-muted-foreground">{t.dueAt ?? ""}</div>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/if}
+    </section>
+
+    <!-- Recent Notes -->
+    <section class="rounded-2xl border bg-card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Recent Notes</h2>
+          <p class="text-xs text-muted-foreground">Notes from the last 10 actions</p>
+        </div>
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          on:click={() => (expanded.notes = !expanded.notes)}>
+          {expanded.notes ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {#if expanded.notes}
+        <div class="mt-4">
+          {#if loadingNotes}
+            <div class="text-sm text-muted-foreground">Loading…</div>
+          {:else if recentNotes.length === 0}
+            <div class="text-sm text-muted-foreground">No notes found.</div>
+          {:else}
+            <ul class="space-y-2">
+              {#each recentNotes as n}
+                <li class="rounded-lg border p-3">
+                  <div class="text-xs text-muted-foreground">{n.at ?? ""} • {n.source ?? ""}</div>
+                  <div class="text-sm mt-1">{n.note}</div>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/if}
+    </section>
+
+    <!-- Shelf Utilization -->
+    <section class="rounded-2xl border bg-card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Shelf Utilization</h2>
+          <p class="text-xs text-muted-foreground">Capacity vs current usage</p>
+        </div>
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          on:click={() => (expanded.shelf = !expanded.shelf)}>
+          {expanded.shelf ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {#if expanded.shelf}
+        <div class="mt-4">
+          {#if loadingShelf}
+            <div class="text-sm text-muted-foreground">Loading…</div>
+          {:else if !shelfUtil}
+            <div class="text-sm text-muted-foreground">No data.</div>
+          {:else}
+            <div class="flex items-center gap-4">
+              <div class="flex-1">
+                <div class="h-3 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    class="h-3 rounded-full bg-emerald-500"
+                    style={`width: ${shelfUtil.percent}%`}
+                    aria-label="utilization bar" />
+                </div>
+                <div class="mt-2 text-xs text-muted-foreground">
+                  {shelfUtil.usedCm2} / {shelfUtil.capacityCm2} cm² • {shelfUtil.percent}% used
+                </div>
+              </div>
+              <div class="text-sm text-muted-foreground">
+                {shelfUtil.itemsCounted} items • {shelfUtil.shelvesCount} shelves
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </section>
+
+    <!-- Asset Locations -->
+    <section class="rounded-2xl border bg-card p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-semibold">Asset Locations</h2>
+          <p class="text-xs text-muted-foreground">Bins and groups by shelf</p>
+        </div>
+        <button
+          class="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted"
+          on:click={() => (expanded.shelfAssets = !expanded.shelfAssets)}>
+          {expanded.shelfAssets ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {#if expanded.shelfAssets}
+        <div class="mt-4">
+          {#if loadingAssets}
+            <div class="text-sm text-muted-foreground">Loading…</div>
+          {:else if bins.length === 0}
+            <div class="text-sm text-muted-foreground">No bins created yet.</div>
+          {:else}
+            <ul class="space-y-2">
+              {#each bins as b}
+                <li class="rounded-lg border p-3">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <div class="text-sm font-medium">{b.label}</div>
+                      <div class="text-xs text-muted-foreground">
+                        Shelf: {b.shelfLabel ?? b.shelfId ?? "—"}
+                      </div>
+                    </div>
+                    <div class="text-sm text-muted-foreground">{b.count ?? 0} items</div>
+                  </div>
+                  {#if assignments.length}
+                    <div class="mt-2">
+                      <div class="text-xs text-muted-foreground mb-1">Assignments:</div>
+                      <ul class="grid sm:grid-cols-2 gap-2">
+                        {#each assignments.filter((a) => a.binId === b.id) as a}
+                          <li class="rounded border px-2 py-1 text-xs">
+                            {a.groupLabel ?? `Grow #${a.growId ?? "—"}`}
+                          </li>
+                        {/each}
+                      </ul>
+                    </div>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/if}
+    </section>
+  </div>
+
+  <!-- Dev helper: create default location if missing -->
+  {#if !locationId}
+    <div class="rounded-xl border bg-amber-50 border-amber-200 p-4">
+      <div class="text-sm">
+        No location configured. Create one with:
+        <pre class="text-xs overflow-auto p-3 bg-white rounded-lg border mt-2"><code>curl -X POST http://localhost:5173/api/dev/seed/default-location \
+  -H "content-type: application/json" \
+  -d '{"owner_user_id":1,"name":"Default Lab","timezone":"America/Denver"}'</code></pre>
+        <div class="mt-2 text-xs text-muted-foreground">Then refresh this page.</div>
+      </div>
+    </div>
+  {/if}
+</div>
