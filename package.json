@@ -14,10 +14,12 @@
     "format": "prettier --write .",
     "lint": "prettier --check . && eslint .",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "drizzle-kit migrate",
     "drizzle:studio": "drizzle-kit studio",
+    "seed:demo": "tsx scripts/demo-seed.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts"
   },
   "devDependencies": {
@@ -48,7 +50,8 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.44.1",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",

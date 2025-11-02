@@ -300,16 +300,3 @@ export const yieldData = sqliteTable("yield_data", {
 
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
-
-/** Tasks: time-based actions for dashboard/calendar */
-export const tasks = sqliteTable("tasks", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  growId: integer("grow_id").references(() => grows.id, { onDelete: "set null" }),
-  title: text("title").notNull(),
-  status: text("status").$type<'pending' | 'active' | 'completed' | 'failed'>().notNull().default('pending'),
-  dueAt: text("due_at"),
-  notes: text("notes"),
-  createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: text("updated_at"),
-});

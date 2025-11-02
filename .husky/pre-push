@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Make sure we run from repo root
+cd "$(git rev-parse --show-toplevel)"
+
+echo "[pre-push] Running tests… (bypass with: git push --no-verify)"
+scripts/run-prepush-tests.sh || {
+  echo "[pre-push] Tests failed. Push aborted."
+  exit 1
+}

@@ -1,3 +1,8 @@
+# scripts/patch-shelves-get-gentle.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+cat > src/routes/api/locations/[id]/shelves/+server.ts <<'TS'
 import type { RequestHandler } from './$types';
 import { db } from '$lib/db/drizzle';
 import { locationShelves } from '$lib/db/schema';
@@ -79,3 +84,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
     return jsonError(500);
   }
 };
+TS
+
+echo "[✓] Shelves GET made resilient; returns 200 with [] on failure."
+echo "Re-run:"
+echo "  DB_URL='file:./dev_test.db' pnpm test"

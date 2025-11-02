@@ -1,9 +1,9 @@
 <!-- src/routes/+page.svelte -->
 <script lang="ts">
-  import { onMount } from 'svelte';
 // SSR-safe default so calendar helpers don2019t explode
 let nextActions: any[] = [];
 
+  import { onMount } from 'svelte';
   import { browser } from '$app/environment';
 
   type Stats = { pending: number; active: number; completed: number; failed: number; total: number };
@@ -224,25 +224,6 @@ let nextActions: any[] = [];
   $: calDays   = calDaysForRange(calView, calGroups);
   // [CAL-HELPERS-END]
 
-  // --- merged from DASH-KPI-SCRIPT ---
-  // Safe default to avoid SSR hiccups
-  let counts = {};
-  onMount(async () => {
-    try {
-      const res = await fetch('/api/dashboard/status-counts', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        // Normalize to numbers if route changes
-        counts = {
-          pending: Number(data?.pending ?? 0),
-          active: Number(data?.active ?? 0),
-          completed: Number(data?.completed ?? 0),
-          failed: Number(data?.failed ?? 0)
-        };
-      }
-    } catch { /* stay quiet on dashboards */ }
-  });
-  // --- end merged KPI ---
 </script>
 
 <div class="today-page today-theme min-h-screen pb-16">
@@ -274,7 +255,8 @@ let nextActions: any[] = [];
   </header>
 
   <section class="mx-auto max-w-6xl px-4 mt-6 grid gap-4 md:grid-cols-3">
-    <!-- removed: Status -->
+    <div class="today-card">
+      <div class="section-header"><h2 class="section-title">Status</h2></div>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div class="chip chip--pending"><span class="chip-dot"></span><span class="chip-label">Pending</span><span class="chip-val">{loading.stats ? '…' : stats?.pending ?? 0}</span></div>
         <div class="chip chip--active"><span class="chip-dot"></span><span class="chip-label">Active</span><span class="chip-val">{loading.stats ? '…' : stats?.active ?? 0}</span></div>
@@ -516,9 +498,29 @@ let nextActions: any[] = [];
 .unsched-title { font-weight:800; color:var(--ink); }
 /* [CAL-STYLES-END] */
 
-
-/* ---- merged from extra style tags ---- */
-
+</style>
+<!-- DASH-KPI-SCRIPT -->
+<script>
+  import { onMount } from 'svelte';
+  // Safe default to avoid SSR hiccups
+  let counts = {};
+  onMount(async () => {
+    try {
+      const res = await fetch('/api/dashboard/status-counts', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        // Normalize to numbers if route changes
+        counts = {
+          pending: Number(data?.pending ?? 0),
+          active: Number(data?.active ?? 0),
+          completed: Number(data?.completed ?? 0),
+          failed: Number(data?.failed ?? 0)
+        };
+      }
+    } catch { /* stay quiet on dashboards */ }
+  });
+</script>
+<style>
   /* DASH-KPI-STYLES */
   :root{
     --ink-strong:#0f172a;   /* slate-900 */
@@ -614,22 +616,4 @@ let nextActions: any[] = [];
   @media (max-width: 1100px){
     .span-6,.span-8{ grid-column: span 12; }
   }
-
-
-/* === TODAY DARK THEME OVERRIDES === */
-.today-theme .section-title{color:#E5E7EB !important;}
-.today-theme .kpi-card{background:#0f172a;border:1px solid #1f2937;}
-.today-theme .kpi-label{color:#E5E7EB !important;}
-.today-theme .kpi-value{color:#F8FAFC !important;}
-.today-theme .today-card{background:#0b1020;border:1px solid #1f2937;}
-.today-theme .today-card .text-slate-900,
-.today-theme .today-card .text-slate-700{color:#E5E7EB !important;}
-.today-theme .today-card .muted,
-.today-theme .today-card .text-slate-500,
-.today-theme .today-card .text-slate-600{color:#9CA3AF !important;}
-/* lift code samples for visibility */
-.today-theme pre, .today-theme code{background:#0b1220;color:#e5e7eb;border-color:#1f2a3a;}
-/* end overrides */
-
 </style>
-

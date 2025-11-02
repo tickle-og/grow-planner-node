@@ -1,55 +1,71 @@
-import { json, jsonError } from '$lib/server/http';
+import type { RequestHandler } from '@sveltejs/kit';
+import { db } from '$lib/db/drizzle';
+import { tasks } from '$lib/db/schema';
+import { and, gte, lte, eq, inArray, isNotNull } from 'drizzle-orm';
+import { json, jsonError } from '$lib/utils/json';
 
-import { json, jsonError } from '$lib/server/http';
+function iso(d: Date) {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+}
+function startOfDay(d = new Date()) {
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  return x;
+}
+function addDays(d: Date, n: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
 
-import type { RequestHandler } from "./$types";
-import { db } from "$lib/db/drizzle";
-import { grows } from "$lib/db/schema";
-import { and, eq, ne, sql } from "drizzle-orm";
-import { getLocationIdOrThrow, getNum } from "../_util";
-
-export const GET: RequestHandler = async (event) => {
+export const GET: RequestHandler = async ({ url }) => {
   try {
-    const locationId = getLocationIdOrThrow(event);
-    const limit = getNum(event, "limit", 20, 1, 100);
+    // Window control
+    const scope = (url.searchParams.get('scope') || 'week').toLowerCase(); // week | 14 | all
+    const locationId = Number(url.searchParams.get('location_id') || '1');
 
-    const gs = await db
-      .select({
-        id: grows.id,
-        status: grows.status,
-        startDate: grows.startDate,
-        inoculationDate: grows.inoculationDate,
-        incubationStartAt: grows.incubationStartAt,
-        colonizationCompleteAt: grows.colonizationCompleteAt,
-        movedToFruitingAt: grows.movedToFruitingAt,
-        containerType: grows.containerType,
-        batchCode: grows.batchCode
-      })
-      .from(grows)
-      .where(and(
-        eq(grows.locationId, locationId),
-        ne(grows.status, "complete"),
-        ne(grows.status, "retired"),
-        ne(grows.status, "contaminated")
-      ));
+    const now0 = startOfDay(new Date());
+    let end = addDays(now0, 7);
+    if (scope === '14') end = addDays(now0, 14);
+    if (scope === 'all') end = addDays(now0, 90); // practical cap for UI
 
-    const actions: Array<{ growId: number; action: string; reason: string }> = [];
-    for (const g of gs) {
-      if (!g.startDate) actions.push({ growId: g.id, action: "Set start date", reason: "planning with no startDate" });
-      if (g.status === "planning" && g.startDate && !g.inoculationDate) {
-        actions.push({ growId: g.id, action: "Inoculate", reason: "started but no inoculation_date" });
-      }
-      if (g.inoculationDate && !g.incubationStartAt) {
-        actions.push({ growId: g.id, action: "Start incubation", reason: "inoculated but no incubation_start_at" });
-      }
-      if (g.incubationStartAt && !g.colonizationCompleteAt) {
-        actions.push({ growId: g.id, action: "Check colonization", reason: "incubating and not marked complete" });
-      }
-      if (g.colonizationCompleteAt && !g.movedToFruitingAt) {
-        actions.push({ growId: g.id, action: "Move to fruiting", reason: "colonized but not in fruiting" });
-      }
+    // pending + active with a due date in window
+    const rows = await db.select().from(tasks).where(
+      and(
+        eq(tasks.locationId, locationId),
+        inArray(tasks.status, ['pending','active']),
+        isNotNull(tasks.dueAt),
+        gte(tasks.dueAt, iso(now0)),
+        lte(tasks.dueAt, iso(end))
+      )
+    ).orderBy(tasks.dueAt);
+
+    // Also pull unscheduled tasks (no due_at), limited to 20 for sidebar lists
+    const unscheduled = await db.select().from(tasks).where(
+      and(
+        eq(tasks.locationId, locationId),
+        inArray(tasks.status, ['pending','active']),
+        tasks.dueAt.isNull?.() ?? (tasks.dueAt as any).isNull() // compat across drizzle versions
+      )
+    ).limit(20);
+
+    // Calendar grouping by YYYY-MM-DD
+    const calendar: Record<string, typeof rows> = {};
+    for (const t of rows) {
+      const day = String(t.dueAt).slice(0, 10); // YYYY-MM-DD
+      (calendar[day] ||= []).push(t);
     }
 
+    return json({
+      ok: true,
+      locationId,
+      scope,
+      range: { start: iso(now0), end: iso(end) },
+      list: rows,            // already sorted ASC by due_at
+      calendar,              // for grid rendering
+      unscheduled            // optional panel
+    });
+  } catch {
     return jsonError(500);
   }
 };

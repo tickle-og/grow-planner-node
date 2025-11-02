@@ -1,105 +1,178 @@
+<!-- src/routes/calendar/+page.svelte -->
 <script lang="ts">
-  export let data: {
-    windowStart: number;
-    days: number[];
-    groups: Array<{ batchId: string; batchName: string; tasks: any[] }>;
-  };
+  export let data: { locationId: number; tasks: any[] };
 
-  const DAY = 24 * 60 * 60 * 1000;
-  const short = (id: string) => id?.slice(0, 6) ?? '';
-
-  function dayIndex(ts: number) {
-    return Math.max(0, Math.floor((ts - data.windowStart) / DAY));
+  function safeDate(v: any): Date | null {
+    if (!v && v !== 0) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function taskDueAt(t: any): Date | null {
+    for (const k of ['dueAt','due_at','due','dueDate','due_date','scheduledAt','scheduled_at']) {
+      const d = safeDate(t[k]);
+      if (d) return d;
+    }
+    return null;
+  }
+  function groupTasksByDay(ts: any[]) {
+    const map = new Map<string, any[]>();
+    for (const t of ts) {
+      const d = taskDueAt(t);
+      const key = d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString().slice(0,10) : 'unscheduled';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(t);
+    }
+    return map;
+  }
+  function nextNDates(n = 7) {
+    const out: string[] = [];
+    const now = new Date();
+    for (let i = 0; i < n; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      out.push(d.toISOString().slice(0,10));
+    }
+    return out;
+  }
+  function sortBySoonest(a: any, b: any) {
+    const da = taskDueAt(a); const db = taskDueAt(b);
+    if (da && db) return da.getTime() - db.getTime();
+    if (da && !db) return -1;
+    if (!da && db) return 1;
+    return 0;
   }
 
-  function spanDays(dueAt: number, durationMin: number) {
-    const durMs = Math.max(60_000, (durationMin ?? 60) * 60_000);
-    const start = dueAt - durMs;
-    const span = Math.max(1, Math.ceil(durMs / DAY));
-    return { startIdx: dayIndex(start), span };
-  }
+  // Reactive data
+  $: tasks = (data.tasks ?? []).slice().sort(sortBySoonest);
+  $: groups = groupTasksByDay(tasks);
 
-  function monthHeaderParts(dayTs: number) {
-    const d = new Date(dayTs);
-    return {
-      month: d.toLocaleString(undefined, { month: 'short' }),
-      day: d.getDate()
-    };
+  type View = 'week' | '14' | 'all';
+  let view: View = 'week';
+
+  function daysForRange(v: View) {
+    if (v === 'week') return nextNDates(7);
+    if (v === '14') return nextNDates(14);
+    // 'all' → show all dated buckets present in tasks (ascending)
+    const keys = [...groups.keys()].filter(k => k !== 'unscheduled');
+    keys.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    // fallback to a week if no dated tasks exist
+    return keys.length ? keys : nextNDates(7);
+  }
+  $: days = daysForRange(view);
+
+  function fmtDateISOToHuman(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   }
 </script>
 
-<h2 class="text-2xl font-semibold mb-4">Calendar (2-month Gantt)</h2>
+<div class="mx-auto max-w-6xl px-4 py-6">
+  <div class="header-row">
+    <h1 class="page-title">Calendar</h1>
+    <div class="subtitle">Location #{data.locationId}</div>
+  </div>
 
-<div class="overflow-x-auto border border-neutral-800 rounded">
-  <div class="min-w-[1100px]">
-    <!-- Month header -->
-    <div class="grid sticky top-0 z-10" style={`grid-template-columns: 16rem repeat(${data.days.length}, 40px);`}>
-      <div class="px-3 py-2 border-b border-neutral-800 bg-neutral-900 font-medium">
-        Batch
-      </div>
-      {#each data.days as d, i}
-        {#if monthHeaderParts(d).day === 1 || i === 0}
-          <div class="px-2 py-2 text-xs text-neutral-200 border-b border-neutral-800 bg-neutral-900 col-[span_1]">
-            {monthHeaderParts(d).month}
-          </div>
-        {:else}
-          <div class="border-b border-neutral-800 bg-neutral-900"></div>
-        {/if}
-      {/each}
-    </div>
+  <!-- Filter row -->
+  <div class="filter-row" role="tablist" aria-label="Calendar range">
+    <button
+      role="tab"
+      aria-selected={view === 'week'}
+      class="filter-btn"
+      class:active={view === 'week'}
+      on:click={() => (view = 'week')}
+    >
+      This week
+    </button>
+    <button
+      role="tab"
+      aria-selected={view === '14'}
+      class="filter-btn"
+      class:active={view === '14'}
+      on:click={() => (view = '14')}
+    >
+      Next 14 days
+    </button>
+    <button
+      role="tab"
+      aria-selected={view === 'all'}
+      class="filter-btn"
+      class:active={view === 'all'}
+      on:click={() => (view = 'all')}
+    >
+      All
+    </button>
+  </div>
 
-    <!-- Day header -->
-    <div class="grid" style={`grid-template-columns: 16rem repeat(${data.days.length}, 40px);`}>
-      <div class="px-3 py-2 border-b border-neutral-900 bg-neutral-950 text-xs text-neutral-400">Task timeline</div>
-      {#each data.days as d, i}
-        <div class="px-2 py-2 text-[11px] text-neutral-500 border-b border-neutral-900 bg-neutral-950 text-center
-                    {new Date(d).getDay() === 0 || new Date(d).getDay() === 6 ? 'bg-neutral-900/60' : ''}">
-          {monthHeaderParts(d).day}
-        </div>
-      {/each}
-    </div>
-
-    <!-- Grid + Rows -->
-    {#each data.groups as g}
-      <div class="grid relative" style={`grid-template-columns: 16rem repeat(${data.days.length}, 40px);`}>
-        <!-- Left label -->
-        <div class="px-3 py-3 border-t border-neutral-900 bg-neutral-950">
-          <div class="font-medium">{g.batchName}</div>
-          <div class="text-[11px] text-neutral-500 font-mono">{short(g.batchId)}</div>
-        </div>
-
-        <!-- Background day grid -->
-        {#each data.days as d}
-          <div class="border-l border-neutral-900 relative
-                      {new Date(d).getDay() === 0 || new Date(d).getDay() === 6 ? 'bg-neutral-900/40' : ''}">
-          </div>
-        {/each}
-
-        <!-- Bars (placed via CSS grid columns) -->
-        {#each g.tasks as t}
-          {#key t.id}
-            {#await Promise.resolve(spanDays(t.dueAt, t.durationMin)) then p}
-              <!-- milestone (0m) as a diamond -->
-              {#if t.durationMin === 0}
-                <div style={`grid-column: ${p.startIdx + 2} / span 1;`} class="pointer-events-auto">
-                  <div class="w-2.5 h-2.5 rotate-45 bg-amber-400 border border-amber-300 shadow
-                              mt-2 translate-x-[-6px]" title={`${t.title}`}></div>
-                </div>
-              {:else}
-                <div style={`grid-column: ${p.startIdx + 2} / span ${p.span};`} class="pointer-events-auto">
-                  <div
-                    class="rounded-md text-[11px] px-2 py-1 truncate border shadow-sm mt-1.5
-                           bg-emerald-700/80 border-emerald-500/50 hover:bg-emerald-600/80"
-                    title={`${t.title}`}
-                  >
-                    {t.title}
-                  </div>
-                </div>
-              {/if}
-            {/await}
-          {/key}
-        {/each}
+  <!-- Grid of days -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+    {#each days as d}
+      <div class="cal-cell">
+        <div class="cal-date">{fmtDateISOToHuman(d)}</div>
+        <ul class="mt-2 space-y-1">
+          {#each (groups.get(d) ?? []) as t}
+            <li class="task-line">• {t.title ?? t.action ?? t.type ?? 'Task'}</li>
+          {/each}
+          {#if (groups.get(d) ?? []).length === 0}
+            <li class="task-empty">—</li>
+          {/if}
+        </ul>
       </div>
     {/each}
   </div>
+
+  {#if view === 'all' && (groups.get('unscheduled') ?? []).length}
+    <div class="unscheduled mt-6">
+      <div class="unscheduled-title">Unscheduled</div>
+      <ul class="mt-2 space-y-1">
+        {#each groups.get('unscheduled') as t}
+          <li class="task-line">• {t.title ?? t.action ?? t.type ?? 'Task'}</li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 </div>
+
+<style>
+  .header-row { display:flex; align-items:baseline; gap:.75rem; }
+  .page-title { font-size:1.5rem; font-weight:800; color:#0b1220; }
+  .subtitle { color:#0b1220; opacity:.8; }
+
+  .filter-row {
+    margin-top: .75rem;
+    display: inline-flex;
+    gap: .4rem;
+    padding: .25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: .75rem;
+    background: #ffffff;
+  }
+  .filter-btn {
+    appearance: none;
+    border: 0;
+    padding: .35rem .7rem;
+    border-radius: .55rem;
+    font-weight: 700;
+    color: #0b1220;
+    background: transparent;
+    cursor: pointer;
+    transition: background .15s ease, box-shadow .15s ease;
+  }
+  .filter-btn:hover { background: #f1f5f9; }
+  .filter-btn.active {
+    background: #0b1220;
+    color: #ffffff;
+    box-shadow: 0 1px 0 rgba(0,0,0,.06), inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+
+  .cal-cell {
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:.5rem;
+    padding:.6rem .7rem;
+  }
+  .cal-date { font-weight:800; color:#0b1220; }
+  .task-line { color:#0b1220; font-size:.95rem; }
+  .task-empty { color:#0b1220; opacity:.8; font-size:.9rem; }
+
+  .unscheduled { background:#fff; border:1px solid #e5e7eb; border-radius:.5rem; padding:.75rem .9rem; }
+  .unscheduled-title { font-weight:800; color:#0b1220; }
+</style>
