@@ -105,3 +105,16 @@ build/
 # misc
 .DS_Store
 *.off
+# local DB + SQLite junk
+dev.db
+dev_test.db
+*.db-wal
+*.db-shm
+
+# svelte build output
+.svelte-kit/
+
+# editor/backup droppings
+*.bak
+*.bak.*
+src/**/*.bak.*

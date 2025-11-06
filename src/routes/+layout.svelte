@@ -1,28 +1,70 @@
 <script lang="ts">
-  import "../app.css";
-  let { children } = $props();
+  export let data: any;
 </script>
 
-<div class="min-h-screen grid grid-cols-[16rem_1fr] bg-neutral-950 text-neutral-100">
-  <aside class="border-r border-neutral-800 p-4 space-y-2">
-    <h1 class="text-xl font-semibold mb-4">Grow Planner</h1>
-    <nav class="grid gap-1">
-      <a class="px-3 py-2 rounded hover:bg-neutral-800" href="/">Today</a>
-      <a class="px-3 py-2 rounded hover:bg-neutral-800" href="/batches">Batches</a>
-      <a class="px-3 py-2 rounded hover:bg-neutral-800" href="/calendar">Calendar</a>
-      <a class="px-3 py-2 rounded hover:bg-neutral-800" href="/recipes">Recipes</a>
-      <a class="px-3 py-2 rounded hover:bg-neutral-800" href="/logs">Logs</a>
-      <a class="px-3 py-2 rounded hover:bg-neutral-800" href="/reports">Reports</a>
-      <a class="px-3 py-2 rounded hover:bg-neutral-800" href="/settings">Settings</a>
+<div class="app-grid">
+  <aside class="sidebar">
+    <h1 class="brand">Grow Planner</h1>
+    <nav class="menu">
+      <a href="/" data-sveltekit-preload-data="hover">Today</a>
+      <a href="/batches"  data-sveltekit-preload-data="hover">Batches</a>
+      <a href="/calendar" data-sveltekit-preload-data="hover">Calendar</a>
+      <a href="/recipes"  data-sveltekit-preload-data="hover">Recipes</a>
+      <a href="/logs"     data-sveltekit-preload-data="hover">Logs</a>
+      <a href="/reports"  data-sveltekit-preload-data="hover">Reports</a>
+      <a href="/settings" data-sveltekit-preload-data="hover">Settings</a>
     </nav>
   </aside>
 
-  <main class="p-6">
-    {@render children()}
+  <main class="content">
+    <slot />
   </main>
 </div>
 
-<svelte:head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='12' fill='%2300e29f'/%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' dominant-baseline='middle' font-size='40' fill='%230b0b0b'%3EG%3C/text%3E%3C/svg%3E" />
-</svelte:head>
+<style>
+  :global(html, body) {
+    height: 100%;
+    margin: 0;
+    background: #0a0a0a;
+  }
+
+  .app-grid {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 16rem 1fr; /* fixed sidebar, fluid content */
+    background: #0a0a0a;
+    color: #f5f5f5;
+  }
+
+  .sidebar {
+    position: sticky;       /* stays put while main scrolls */
+    top: 0;
+    height: 100vh;
+    border-right: 1px solid #262626;
+    padding: 1.25rem;
+  }
+
+  .brand {
+    margin: 0 0 1rem 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: .2px;
+  }
+
+  .menu a {
+    display: block;
+    padding: .5rem .75rem;
+    border-radius: .5rem;
+    color: inherit;
+    text-decoration: none;
+    opacity: .9;
+    transition: background .12s ease, opacity .12s ease;
+  }
+  .menu a:hover { background: #181818; opacity: 1; }
+
+  .content {
+    min-height: 100vh;
+    overflow: auto;
+    padding: 1.5rem;
+  }
+</style>

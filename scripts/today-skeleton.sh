@@ -1,3 +1,12 @@
+# scripts/today-skeleton.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+PAGE="src/routes/+page.svelte"
+ts=$(date +%Y%m%d-%H%M%S)
+[[ -f "$PAGE" ]] && cp -p "$PAGE" "$PAGE.bak.$ts" && echo "[backup] $PAGE -> $PAGE.bak.$ts"
+
+cat > "$PAGE" <<'SVELTE'
 <script lang="ts">
   export let data: any;
 
@@ -78,3 +87,9 @@
   /* Keep it simple: rely on global dark shell; only local tweaks here */
   .today { max-width: 1200px; }
 </style>
+SVELTE
+
+echo "[ok] wrote $PAGE"
+echo "Next:"
+echo "  1) pnpm dev"
+echo "  2) Refresh /. You should see KPI band + compact Upcoming list."

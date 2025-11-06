@@ -1,35 +1,29 @@
-// Tiny JSON response helpers used by API routes.
+export function json(a: number | unknown, b?: unknown) {
+  let status: number;
+  let data: unknown;
 
-type HeadersInit = Record<string, string>;
+  if (typeof a === 'number') {
+    // Called as json(200, data)
+    status = a;
+    data = b ?? {};
+  } else {
+    // Called as json(data, 200) or json(data, { status })
+    data = a;
+    if (typeof b === 'number') {
+      status = b;
+    } else if (b && typeof (b as any).status === 'number') {
+      status = (b as any).status;
+    } else {
+      status = 200;
+    }
+  }
 
-export function json(
-  data: unknown,
-  status = 200,
-  extraHeaders: HeadersInit = {}
-): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      ...extraHeaders,
-    },
+    headers: { 'content-type': 'application/json' }
   });
 }
 
-export function jsonError(
-  status = 500,
-  message = 'Internal Error',
-  extraHeaders: HeadersInit = {}
-): Response {
-  return json({ message }, status, extraHeaders);
-}
-
-export function jsonCache(
-  data: unknown,
-  seconds = 300,
-  status = 200
-): Response {
-  return json(data, status, {
-    'cache-control': `public, max-age=${seconds}`,
-  });
+export function jsonError(status = 500, message = 'Internal Error') {
+  return json({ message }, { status });
 }

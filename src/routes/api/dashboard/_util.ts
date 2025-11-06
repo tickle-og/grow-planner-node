@@ -1,22 +1,28 @@
-import type { RequestEvent } from "@sveltejs/kit";
+export function getLocationIdOrThrow(
+  input: URL | string | Request | { url?: string; searchParams?: URLSearchParams }
+): number {
+  let sp: URLSearchParams | null = null;
 
-export function getLocationIdOrThrow(event: RequestEvent): number {
-  const id = Number(event.url.searchParams.get("location_id"));
+  if (input instanceof URL) {
+    sp = input.searchParams;
+  } else if (typeof input === 'string') {
+    sp = new URL(input, 'http://local').searchParams;
+  } else if (typeof Request !== 'undefined' && input instanceof Request) {
+    sp = new URL(input.url, 'http://local').searchParams;
+  } else if (input && typeof (input as any).searchParams !== 'undefined') {
+    sp = (input as any).searchParams as URLSearchParams;
+  } else if (input && typeof (input as any).url === 'string') {
+    sp = new URL((input as any).url, 'http://local').searchParams;
+  }
+
+  if (!sp) {
+    throw new Error('Missing or invalid ?location_id');
+  }
+
+  const val = sp.get('location_id') ?? sp.get('locationId') ?? '1';
+  const id = Number(val);
   if (!Number.isFinite(id) || id <= 0) {
     throw new Error('Missing or invalid ?location_id');
   }
   return id;
-}
-
-export function getNum(event: RequestEvent, key: string, fallback: number, min?: number, max?: number) {
-  const raw = event.url.searchParams.get(key);
-  const v = raw === null ? fallback : Number(raw);
-  if (!Number.isFinite(v)) return fallback;
-  if (min !== undefined && v < min) return min;
-  if (max !== undefined && v > max) return max;
-  return v;
-}
-
-export function yyyymmdd(d: Date) {
-  return d.toISOString().slice(0, 10);
 }

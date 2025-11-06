@@ -1,3 +1,11 @@
+# scripts/create-reports-page.sh
+set -euo pipefail
+DIR="src/routes/reports"
+FILE="$DIR/+page.svelte"
+mkdir -p "$DIR"
+cp -n "$FILE" "$FILE.bak.$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+
+cat > "$FILE" <<'SVELTE'
 <script lang="ts">
   export let data;
   const { locationId } = data ?? { locationId: 1 };
@@ -99,3 +107,6 @@
   .gap-4 { gap: 1rem; }
   @media (min-width: 768px) { .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
+SVELTE
+
+echo "[ok] Created $FILE"

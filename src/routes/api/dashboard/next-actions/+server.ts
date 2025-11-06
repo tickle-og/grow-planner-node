@@ -1,71 +1,52 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/db/drizzle';
-import { tasks } from '$lib/db/schema';
-import { and, gte, lte, eq, inArray, isNotNull } from 'drizzle-orm';
-import { json, jsonError } from '$lib/utils/json';
+import { sql } from 'drizzle-orm';
 
-function iso(d: Date) {
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
-}
-function startOfDay(d = new Date()) {
-  const x = new Date(d);
-  x.setHours(0,0,0,0);
-  return x;
-}
-function addDays(d: Date, n: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
+// GET /api/dashboard/next-actions?days=14
+// Returns upcoming (and unscheduled) tasks, EXCLUDING dismissed ones.
 export const GET: RequestHandler = async ({ url }) => {
   try {
-    // Window control
-    const scope = (url.searchParams.get('scope') || 'week').toLowerCase(); // week | 14 | all
-    const locationId = Number(url.searchParams.get('location_id') || '1');
+    const daysParam = url.searchParams.get('days');
+    const days = Number.isFinite(Number(daysParam)) ? Number(daysParam) : 14;
+    const modifier = `+${days} days`; // e.g. "+14 days"
 
-    const now0 = startOfDay(new Date());
-    let end = addDays(now0, 7);
-    if (scope === '14') end = addDays(now0, 14);
-    if (scope === 'all') end = addDays(now0, 90); // practical cap for UI
+    // Pull a compact set: id/title/name/due_at/status, filter out dismissed server-side.
+    // Keep unscheduled (due_at NULL) but sort them last.
+    const res = await db.execute(sql`
+      SELECT
+        id,
+        COALESCE(title, name, 'Untitled task') AS title,
+        due_at,
+        status
+      FROM tasks
+      WHERE dismissed_at IS NULL
+        AND (
+          due_at IS NULL
+          OR date(due_at) <= date('now', ${modifier})
+        )
+      ORDER BY
+        CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,
+        datetime(due_at) ASC
+      LIMIT 200
+    `);
 
-    // pending + active with a due date in window
-    const rows = await db.select().from(tasks).where(
-      and(
-        eq(tasks.locationId, locationId),
-        inArray(tasks.status, ['pending','active']),
-        isNotNull(tasks.dueAt),
-        gte(tasks.dueAt, iso(now0)),
-        lte(tasks.dueAt, iso(end))
-      )
-    ).orderBy(tasks.dueAt);
+    const items = (res.rows as any[]).map((r) => ({
+      id: r.id,
+      title: r.title,
+      // keep both keys for UI compatibility
+      due_at: r.due_at ?? null,
+      dueAt: r.due_at ?? null,
+      status: r.status ?? null
+    }));
 
-    // Also pull unscheduled tasks (no due_at), limited to 20 for sidebar lists
-    const unscheduled = await db.select().from(tasks).where(
-      and(
-        eq(tasks.locationId, locationId),
-        inArray(tasks.status, ['pending','active']),
-        tasks.dueAt.isNull?.() ?? (tasks.dueAt as any).isNull() // compat across drizzle versions
-      )
-    ).limit(20);
-
-    // Calendar grouping by YYYY-MM-DD
-    const calendar: Record<string, typeof rows> = {};
-    for (const t of rows) {
-      const day = String(t.dueAt).slice(0, 10); // YYYY-MM-DD
-      (calendar[day] ||= []).push(t);
-    }
-
-    return json({
-      ok: true,
-      locationId,
-      scope,
-      range: { start: iso(now0), end: iso(end) },
-      list: rows,            // already sorted ASC by due_at
-      calendar,              // for grid rendering
-      unscheduled            // optional panel
+    return new Response(JSON.stringify({ ok: true, items }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
     });
-  } catch {
-    return jsonError(500);
+  } catch (e: any) {
+    return new Response(JSON.stringify({ ok: false, error: e?.message || String(e) }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' }
+    });
   }
 };
