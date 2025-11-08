@@ -1,21 +1,10 @@
 {
-  "extends": "./.svelte-kit/tsconfig.json",
-  "compilerOptions": {
-    "strict": true,
-    "skipLibCheck": true,
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable",
-      "WebWorker"
-    ]
-  },
-  "include": [
-    "src/**/*",
-    "src/types/**/*.d.ts"
-  ],
-  "exclude": [
-    "src/**/*.disabled/**",
-    "**/*.disabled/**"
-  ]
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"strict": true,
+		"skipLibCheck": true,
+		"lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"]
+	},
+	"include": ["src/**/*", "src/types/**/*.d.ts"],
+	"exclude": ["src/**/*.disabled/**", "**/*.disabled/**"]
 }

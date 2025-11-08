@@ -1,0 +1,294 @@
+================================================================================
+CODE REVIEW REPORT: grow-planner-node
+Generated: 2025-11-07
+================================================================================
+
+CRITICAL ISSUES
+================================================================================
+
+1. SYNTAX ERROR in /src/routes/api/dev/seed/presets/+server.ts
+   Location: Lines 99-100
+   Issue: Missing catch block. The try statement (line 11) has no catch block.
+   Line 98 ends with "return jsonError(500);" but no catch follows at line 100.
+   Impact: Code will not compile. Blocks entire build.
+   Fix: Add catch block or restructure logic
+
+2. DUPLICATE IMPORT STATEMENTS in /src/routes/api/dev/seed/presets/+server.ts
+   Location: Lines 1-3
+   Issue: Lines 1-3 both import from '$lib/server/http'
+   - Line 1: import { json, jsonError } from '$lib/server/http';
+   - Line 3: import { json, jsonError } from '$lib/server/http';
+   Impact: Redundant code, readability issue
+   Fix: Remove line 1 or 3 (they're identical)
+
+HIGH PRIORITY ISSUES
+================================================================================
+
+3. INCOMPLETE API IMPLEMENTATIONS
+   
+   a) /src/routes/api/tasks/[id]/complete/+server.ts
+      - Line 4: TODO comment - "wire to DB (set status='completed', completed_at=now())"
+      - Line 6: Empty try-catch that does nothing (no-op)
+      - Impact: API returns success but does nothing; data not persisted
+      - Fix: Implement actual task completion in database
+   
+   b) /src/routes/api/locations/[id]/+server.ts
+      - Returns hardcoded stub response: { ok: true, id }
+      - Should fetch actual location from database
+      - Fix: Query locations table by ID
+   
+   c) /src/routes/api/tasks/[id]/dismiss/+server.ts
+      - Likely also incomplete (check similar patterns)
+
+4. MISSING AUTHENTICATION & AUTHORIZATION
+   
+   a) /src/hooks.server.ts (Lines 5-6)
+      - Hardcoded stub user: { id: 1, username: "dev", role: "admin" }
+      - Used for DEV ONLY but no environment check
+      - ALL requests bypass auth
+      Impact: Production-unsafe; anyone can access any data
+      Fix: Implement JWT verification, use actual user from session
+   
+   b) .env.example line 9
+      - References JWT_SECRET but token never validated
+      - Auth infrastructure incomplete
+      Fix: Implement proper JWT verification in hooks
+   
+   c) No location access control
+      - Users can query any location via API
+      - locationMembers table exists but never checked
+      Fix: Validate user is member of requested location
+
+5. DATABASE CLIENT DUPLICATION
+   
+   Two different database clients exist:
+   
+   a) /src/lib/db/client.ts
+      - Uses better-sqlite3 (local SQLite)
+      - Initialized but NEVER IMPORTED anywhere
+      - Sets up PRAGMA directives for WAL mode
+   
+   b) /src/lib/db/drizzle.ts (ACTUALLY USED)
+      - Uses @libsql/client
+      - All routes import from this file
+      - Also sets up PRAGMA for SQLite
+   
+   Impact: Confusion about which DB client is active; dead code
+   Fix: Remove /src/lib/db/client.ts entirely. Keep only drizzle.ts.
+
+6. INCONSISTENT JSON RESPONSE HELPERS
+   
+   Two similar utilities exist with different implementations:
+   
+   a) /src/lib/utils/json.ts
+      - Flexible overloaded signature: json(data, status?) or json(status, data)
+      - Confusing to use; easy to pass parameters in wrong order
+      - Returns Response with content-type header
+   
+   b) /src/lib/server/http.ts
+      - Similar functions but different signature
+      - Has 'cache' parameter
+      - Lines 2-9 duplicate /src/lib/utils/json.ts functionality
+   
+   c) Import inconsistency across files:
+      - Some files import from $lib/server/http
+      - Others import from $lib/utils/json
+      - No clear convention
+   
+   Impact: Code duplication, inconsistent response handling
+   Fix: Consolidate to single utility file with clear API
+   Recommended: Keep one, delete the other, standardize all imports
+
+MEDIUM PRIORITY ISSUES
+================================================================================
+
+7. FORMATTING & LINTING FAILURES
+   
+   Issue: 89+ files flagged by prettier as needing formatting
+   Warnings in: 
+   - .amp/settings.json
+   - .github/dependabot.yml
+   - drizzle.config.ts
+   - drizzle/meta/*.json
+   - package.json
+   - All src/**/*.ts and *.svelte files
+   
+   Root cause: Code not run through prettier formatting
+   Fix: Run `pnpm run format` to auto-fix all files
+
+8. EXCESSIVE BACKUP FILES
+   
+   Routes directory contains 24 backup files:
+   - src/routes/+page.svelte.bak.* (multiple versions)
+   - src/routes/+layout.svelte.bak.* (4 versions)
+   - src/routes/+page.server.ts.bak.* (4 versions)
+   
+   Root directory:
+   - tsconfig.backup.20251021-113326.json
+   - tsconfig.backup.20251021-114026.json
+   - drizzle.config.ts.backup.20251026T191928Z
+   - .env.backup.20251026T191928Z
+   - app.css.bak.20251104-022742
+   
+   Also duplicated databases:
+   - dev.db (active)
+   - dev.db.bak.20251028023401 (backup)
+   
+   Impact: Repository bloat; confusing for development
+   Fix: Move to ./backups/ directory or .gitignore them
+
+9. SECURITY: SECRETS IN VERSION CONTROL
+   
+   a) .env file exists in repository
+      - Contains DATABASE_URL and other secrets
+      - Should NEVER be committed
+      - Impact: Credentials exposed to anyone with repo access
+      - Fix: Remove from git, add to .gitignore
+   
+   b) .env.backup.20251026T191928Z
+      - Another backup of secrets
+      - Fix: Remove from git
+   
+   c) gitleaks binary (executable)
+      - ./gitleaks (executable file in repo)
+      - Should not be version controlled
+      - Fix: Add to .gitignore or remove
+
+10. REDUNDANT .gitignore
+    
+    Lines are repeated multiple times:
+    - "node_modules/" appears 3 times
+    - ".svelte-kit/" appears 3 times
+    - "dist/", "build/" appear 3 times
+    - "gitleaks/" and "gitleaks.json" repeated 3 times
+    
+    Impact: Messy, hard to maintain
+    Fix: Deduplicate and consolidate
+
+11. INCONSISTENT ERROR HANDLING & LOGGING
+    
+    a) Error logging utility exists but underutilized
+       - /src/lib/server/log.ts defines logError()
+       - Most routes use inline console.error() instead
+       - Inconsistent error reporting
+    
+    b) Error responses inconsistent
+       - Some routes return { ok: false, error: message }
+       - Others return { message }
+       - No standard error response format
+    
+    Fix: Use logError() consistently; standardize error responses
+
+ARCHITECTURAL CONCERNS
+================================================================================
+
+12. IMPLICIT LOCATION ID FALLBACK
+    
+    /src/routes/api/dashboard/_util.ts
+    - Line 22: Defaults to '1' if location_id not provided
+    - No validation user owns/has access to location 1
+    - Silently returns data for location 1 if param missing
+    Impact: User might see wrong location's data
+    Fix: Require explicit location_id; throw if missing
+
+13. DASHBOARD ENDPOINT PATTERNS
+    
+    Multiple dashboard endpoints exist:
+    - /api/dashboard/active-grows
+    - /api/dashboard/low-stock
+    - /api/dashboard/recent-yields
+    - /api/dashboard/status-counts
+    - /api/dashboard/activity
+    - /api/dashboard/shelf-utilization
+    - /api/dashboard/next-actions
+    - /api/dashboard/asset-locations
+    - /api/dashboard/recent-notes
+    - /api/dashboard/shelf-util (duplicate of shelf-utilization?)
+    
+    Observation: No test coverage; unclear which are actively used
+
+14. DATABASE SCHEMA OBSERVATIONS
+    
+    Strengths:
+    - Good foreign key relationships
+    - Timestamp fields (createdAt, updatedAt)
+    - Logical separation (grows, cultures, recipes, supplies)
+    
+    Gaps:
+    - Users table has passwordHash but no login endpoint
+    - No migration system documented (drizzle-kit used but unclear)
+    - Task status values not enforced as enum
+    - Container config stored as JSON strings (unvalidated)
+
+15. ENV VARIABLE HANDLING
+    
+    /src/lib/env.ts
+    - Defaults DATABASE_URL to "file:./.data/grow-planner.db"
+    - Generates random JWT_SECRET if not provided
+    - Dev-focused, not production-ready
+    Impact: Random secrets on each startup; data location changes
+    Fix: Require explicit JWT_SECRET in production
+
+TEST COVERAGE
+================================================================================
+
+16. MINIMAL TEST COVERAGE
+    
+    Only 2 test files:
+    - tests/api.smoke.test.ts (4 tests)
+    - tests/dashboard.smoke.test.ts (unknown count)
+    
+    Missing tests for:
+    - All authentication endpoints (don't exist)
+    - Task management endpoints
+    - Grow CRUD operations
+    - Location access control
+    - Data validation
+    - Error scenarios
+    
+    Impact: No safety net for refactoring; bugs slip through
+    Fix: Add tests for critical paths
+
+SUMMARY OF REQUIRED FIXES
+================================================================================
+
+IMMEDIATE (Blocks Build):
+  1. Fix syntax error in presets seed endpoint (line 99-100)
+  2. Remove duplicate imports (lines 1-3)
+
+URGENT (Blocks Functionality):
+  3. Remove unused db/client.ts
+  4. Consolidate JSON helper utilities
+  5. Implement JWT authentication
+  6. Implement location access control
+  7. Wire up task endpoints (complete/dismiss)
+  8. Clean up backup files and .env from git
+
+IMPORTANT (Code Quality):
+  9. Run prettier formatting
+  10. Deduplicate .gitignore
+  11. Standardize error handling
+  12. Add comprehensive tests
+
+NICE-TO-HAVE:
+  13. Remove gitleaks binary from repo
+  14. Move backup files to proper location
+  15. Add environment validation
+  16. Document API patterns
+
+RECOMMENDATION PRIORITY ORDER
+================================================================================
+
+1. FIX SYNTAX ERROR (presets seed) - 5 min
+2. REMOVE DB CLIENT DUPLICATION - 10 min
+3. CONSOLIDATE JSON HELPERS - 15 min
+4. RUN PRETTIER - 5 min
+5. CLEAN UP GIT ARTIFACTS - 10 min
+6. IMPLEMENT AUTHENTICATION - 1-2 hours
+7. ADD LOCATION ACCESS CONTROL - 1 hour
+8. WIRE UP INCOMPLETE ENDPOINTS - 1-2 hours
+9. EXPAND TESTS - 2+ hours
+
+================================================================================
+END OF REPORT
+================================================================================

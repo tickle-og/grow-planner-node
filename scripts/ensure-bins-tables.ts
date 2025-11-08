@@ -39,10 +39,10 @@ CREATE INDEX IF NOT EXISTS idx_bin_assignments_active ON bin_assignments(bin_id,
 `;
 
 async function main() {
-  await client.execute(ddl);
-  console.log('✅ ensured shelf_bins & bin_assignments tables');
+	await client.execute(ddl);
+	console.log('✅ ensured shelf_bins & bin_assignments tables');
 }
 main().catch((e) => {
-  console.error('❌ ensure failed:', e?.message || e);
-  process.exit(1);
+	console.error('❌ ensure failed:', e?.message || e);
+	process.exit(1);
 });

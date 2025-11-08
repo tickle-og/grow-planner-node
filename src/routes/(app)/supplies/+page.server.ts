@@ -4,6 +4,9 @@ import { supplies } from '$lib/db/schema';
 import { sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-  const list = await db.select().from(supplies).orderBy(sql`name collate nocase`);
-  return { list };
+	const list = await db
+		.select()
+		.from(supplies)
+		.orderBy(sql`name collate nocase`);
+	return { list };
 };

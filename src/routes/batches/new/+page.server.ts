@@ -8,84 +8,80 @@ import { redirect } from '@sveltejs/kit';
 import { eq, asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-  const recipes = await db
-    .select()
-    .from(schema.recipes)
-    .orderBy(asc(schema.recipes.name))
-    .all();
+	const recipes = await db.select().from(schema.recipes).orderBy(asc(schema.recipes.name)).all();
 
-  return { recipes };
+	return { recipes };
 };
 
 const CreateBatchSchema = z.object({
-  name: z.string().min(1),
-  recipeId: z.string().min(1),
-  qtyUnits: z.coerce.number().int().min(1),
-  startDate: z.string().min(1) // yyyy-mm-dd
+	name: z.string().min(1),
+	recipeId: z.string().min(1),
+	qtyUnits: z.coerce.number().int().min(1),
+	startDate: z.string().min(1) // yyyy-mm-dd
 });
 
 export const actions: Actions = {
-  create: async ({ request }) => {
-    const form = await request.formData();
-    const payload = {
-      name: String(form.get('name') ?? ''),
-      recipeId: String(form.get('recipeId') ?? ''),
-      qtyUnits: String(form.get('qtyUnits') ?? ''),
-      startDate: String(form.get('startDate') ?? '')
-    };
+	create: async ({ request }) => {
+		const form = await request.formData();
+		const payload = {
+			name: String(form.get('name') ?? ''),
+			recipeId: String(form.get('recipeId') ?? ''),
+			qtyUnits: String(form.get('qtyUnits') ?? ''),
+			startDate: String(form.get('startDate') ?? '')
+		};
 
-    const parsed = CreateBatchSchema.safeParse(payload);
-    if (!parsed.success) {
-      return { ok: false, error: parsed.error.errors.map(e => e.message).join(', ') };
-    }
+		const parsed = CreateBatchSchema.safeParse(payload);
+		if (!parsed.success) {
+			return { ok: false, error: parsed.error.errors.map((e) => e.message).join(', ') };
+		}
 
-    const { name, recipeId, qtyUnits, startDate } = parsed.data;
-    const startMs = new Date(startDate + 'T00:00:00').getTime();
-    const now = Date.now();
+		const { name, recipeId, qtyUnits, startDate } = parsed.data;
+		const startMs = new Date(startDate + 'T00:00:00').getTime();
+		const now = Date.now();
 
-    // Fetch recipe
-    const recipe = await db
-      .select()
-      .from(schema.recipes)
-      .where(eq(schema.recipes.id, recipeId))
-      .get();
+		// Fetch recipe
+		const recipe = await db
+			.select()
+			.from(schema.recipes)
+			.where(eq(schema.recipes.id, recipeId))
+			.get();
 
-    if (!recipe) return { ok: false, error: 'Recipe not found' };
+		if (!recipe) return { ok: false, error: 'Recipe not found' };
 
-    // Create batch
-    const batchId = createId();
-    await db.insert(schema.batches).values({
-      id: batchId,
-      name,
-      recipeId,
-      qtyUnits,
-      stage: 'plan',
-      startDate: startMs,
-      targetHarvestDate: null,
-      locationId: null,
-      notes: '',
-      createdAt: now,
-      updatedAt: now
-    });
+		// Create batch
+		const batchId = createId();
+		await db.insert(schema.batches).values({
+			id: batchId,
+			name,
+			recipeId,
+			qtyUnits,
+			stage: 'plan',
+			startDate: startMs,
+			targetHarvestDate: null,
+			locationId: null,
+			notes: '',
+			createdAt: now,
+			updatedAt: now
+		});
 
-    // Generate tasks from recipe steps
-    const steps = JSON.parse(recipe.steps) as any[];
-    const schedule = generateSchedule(steps, startMs);
-    for (const s of schedule) {
-      await db.insert(schema.tasks).values({
-        id: createId(),
-        batchId,
-        title: s.title,
-        dueAt: s.dueAt,
-        durationMin: s.durationMin,
-        status: 'open',
-        stepKey: s.stepKey,
-        notes: '',
-        createdAt: now,
-        updatedAt: now
-      });
-    }
+		// Generate tasks from recipe steps
+		const steps = JSON.parse(recipe.steps) as any[];
+		const schedule = generateSchedule(steps, startMs);
+		for (const s of schedule) {
+			await db.insert(schema.tasks).values({
+				id: createId(),
+				batchId,
+				title: s.title,
+				dueAt: s.dueAt,
+				durationMin: s.durationMin,
+				status: 'open',
+				stepKey: s.stepKey,
+				notes: '',
+				createdAt: now,
+				updatedAt: now
+			});
+		}
 
-    throw redirect(303, '/');
-  }
+		throw redirect(303, '/');
+	}
 };
